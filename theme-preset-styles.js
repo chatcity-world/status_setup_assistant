@@ -47,7 +47,7 @@ export const THEME_PRESETS = {
         gaugeText: '#d5e0ed', gaugeAccent: '#9db3cd', gaugeTrack: '#3c444f',
     },
     ocean: {
-        id: 'ocean', label: '상태창', scheme: 'dark', swatch: 'linear-gradient(180deg,#002C5F,#0A66B1)',
+        id: 'ocean', label: '바다', scheme: 'dark', swatch: 'linear-gradient(180deg,#002C5F,#0A66B1)',
         background: '#002c5f', cardBackground: 'linear-gradient(180deg,#002C5F 0%,#0A66B1 100%)',
         text: '#ffffff', muted: '#e1eeff', scene: '#225c90', sceneBackground: '#e7f4ff17', thought: '#1a64ae',
         gaugeText: '#ffffff', gaugeAccent: '#a8d7ff', gaugeTrack: '#edf5ff30',
