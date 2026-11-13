@@ -9,7 +9,7 @@ const LCD = {
     label: 'font:650 11px/1.5 system-ui,sans-serif;',
     labelColumn: '42px',
     numbers: "font:700 13px/1.3 'Bitcount Prop Single','IBM Plex Mono',ui-monospace,monospace;",
-    gaugeTrack: '-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 5px,transparent 5px 7px);mask-image:repeating-linear-gradient(90deg,#000 0 5px,transparent 5px 7px);',
+    gaugeTrack: '#ffffff4d',
 };
 
 function lcdFooter(background, grid, ink) {
