@@ -1,4 +1,4 @@
-import { generateTheme, combinedCode, syncThemeFields } from './theme-builder.js';
+import { generateTheme, combinedCode, setThemeBackground, syncThemeFields, themeBackground } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
 import { DEFAULT_HTML, themeVariableNames } from './theme.js';
 import { getLegacyThemePreset, getThemePreset, makeThemePreset, moveThemeItem, normalizeThemeLayout, THEME_PRESETS, useCustomThemeCode } from './theme-presets.js';
@@ -45,7 +45,7 @@ const HTML_OPTIONS = `
         <legend>테마</legend>
         <div class="rp-status-theme-choices">
             ${Object.entries(THEME_PRESETS).map(([key, preset]) => `
-                <button class="rp-status-theme-choice" type="button" data-theme-preset="${key}" aria-pressed="false">
+                <button class="rp-status-theme-choice" type="button" data-theme-preset="${key}" aria-pressed="false" title="${preset.label} 기본값으로 초기화">
                     <span class="rp-status-theme-swatch" style="background:${preset.swatch}" aria-hidden="true"></span>
                     ${preset.label}
                 </button>`).join('')}
@@ -54,12 +54,21 @@ const HTML_OPTIONS = `
     <fieldset class="rp-status-layout" data-theme-layout>
         <legend>배치·색상</legend>
         <p class="rp-status-hint" data-layout-hint hidden>화이트 또는 다크를 선택하면 항목의 배치를 편집할 수 있어요.</p>
+        <label class="rp-status-layout-surface rp-status-layout-color" data-layout-surface hidden>
+            <span>전체 배경</span>
+            <span class="rp-status-color-chip"><input type="color" aria-label="상태창 전체 배경색"></span>
+        </label>
         <div class="rp-status-layout-list" data-layout-items></div>
-        <div class="rp-status-layout-groups" data-layout-groups></div>
     </fieldset>
     <div class="rp-status-code-editor">
         <div class="rp-status-code-heading">
-            <label for="rp-status-html">상태창 테마 코드</label>
+            <div class="rp-status-code-title">
+                <label for="rp-status-html">상태창 테마 코드</label>
+                <button class="menu_button rp-status-code-expand" type="button" data-action="expand-code"
+                    aria-label="테마 코드 전체 보기" title="전체 보기" aria-haspopup="dialog" aria-controls="rp-status-code-dialog">
+                    <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                </button>
+            </div>
             <button class="menu_button" type="button" data-action="open-builder" aria-expanded="false" aria-controls="rp-status-theme-builder">직접 만들기</button>
         </div>
         <form id="rp-status-theme-builder" data-builder hidden>
@@ -69,11 +78,20 @@ const HTML_OPTIONS = `
             <button type="submit" class="menu_button">테마 생성</button>
             <p class="rp-status-result rp-status-theme-result" role="status" data-theme-result></p>
         </form>
-        <textarea class="text_pole rp-status-code" id="rp-status-html" rows="12" spellcheck="false"></textarea>
+        <div data-code-slot>
+            <textarea class="text_pole rp-status-code" id="rp-status-html" rows="12" wrap="soft" spellcheck="false"
+                aria-label="상태창 테마 코드"></textarea>
+        </div>
         <div class="rp-status-actions rp-status-code-actions">
             <button class="menu_button" type="button" data-action="apply-html">저장 및 적용</button>
             <button class="menu_button" type="button" data-action="copy-html">코드 복사</button>
         </div>
+        <dialog id="rp-status-code-dialog" class="rp-status-code-dialog" aria-labelledby="rp-status-code-dialog-title">
+            <div class="rp-status-code-heading">
+                <strong id="rp-status-code-dialog-title">상태창 테마 코드</strong>
+                <button class="menu_button" type="button" data-action="close-code" autofocus>닫기</button>
+            </div>
+        </dialog>
     </div>`;
 
 const TABS = [
@@ -284,6 +302,9 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const profileResult = root.querySelector('[data-profile-result]');
     const profileEditor = root.querySelector('[data-profile-editor]');
     const html = root.querySelector('#rp-status-html');
+    const codeSlot = root.querySelector('[data-code-slot]');
+    const codeDialog = root.querySelector('#rp-status-code-dialog');
+    const expandCode = root.querySelector('[data-action="expand-code"]');
     const themePanel = root.querySelector('#rp-status-panel-html');
     const previewCard = root.querySelector('[data-preview-card]');
     const previewLabel = root.querySelector('[data-preview-label]');
@@ -334,7 +355,8 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         for (const button of presetButtons) {
             button.setAttribute('aria-pressed', String(button.dataset.themePreset === draftPreset));
         }
-        renderLayoutEditor(draftPreset, draftLayouts[draftPreset], settings?.fields, Boolean(themeGeneration));
+        const background = settings && !draftPreset ? themeBackground(html.value || DEFAULT_HTML) : undefined;
+        renderLayoutEditor(draftPreset, draftLayouts[draftPreset], settings?.fields, Boolean(themeGeneration), background);
     }
 
     function updateThemeDraft(code) {
@@ -350,7 +372,14 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     }
 
     function changeLayout({ key, direction, group, property, value }) {
-        if (!draftPreset || themeGeneration) return;
+        if (!settings || themeGeneration) return;
+        if (!draftPreset) {
+            if (!key && !group && property === 'background') {
+                updateThemeDraft(setThemeBackground(html.value || DEFAULT_HTML, value));
+                showResult('');
+            }
+            return;
+        }
         const layout = draftLayouts[draftPreset];
         const index = layout.items.findIndex(item => item.key === key);
         if (direction) {
@@ -360,6 +389,8 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             layout.groups[group][property] = value;
         } else if (index >= 0) {
             layout.items[index][property] = value;
+        } else if (!key && property === 'background') {
+            layout.background = value;
         }
         showPreset(draftPreset);
         showResult('');
@@ -442,6 +473,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         }
 
         if (settings !== next || editedAvatar !== avatar) {
+            if (codeDialog.open) codeDialog.close();
             editedAvatar = avatar;
             settings = next;
             draftLayouts = structuredClone(next?.themeLayouts ?? {});
@@ -532,6 +564,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         const open = icon.classList.contains('up');
         header.setAttribute('aria-expanded', String(open));
         if (open) syncPanel();
+        else if (codeDialog.open) codeDialog.close();
     });
     drawerObserver.observe(icon, { attributes: true, attributeFilter: ['class'] });
     html.addEventListener('input', () => {
@@ -551,10 +584,18 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         syncPresetSelection();
         paintPreview();
     });
+    codeDialog.addEventListener('close', () => {
+        if (!codeDialog.open) codeSlot.append(html);
+    });
+    codeDialog.addEventListener('keydown', event => {
+        if (event.key === 'Escape') event.stopPropagation();
+    });
     for (const button of presetButtons) {
         button.addEventListener('click', () => {
             if (!settings || themeGeneration) return;
-            showPreset(button.dataset.themePreset);
+            const preset = button.dataset.themePreset;
+            delete draftLayouts[preset];
+            showPreset(preset);
             showResult('');
         });
     }
@@ -628,6 +669,13 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
 
     const actions = {
         'add-field': () => addFieldRow(fields).focus(),
+        'expand-code': () => {
+            if (codeDialog.open) return;
+            expandCode.focus();
+            codeDialog.showModal();
+            codeDialog.append(html);
+        },
+        'close-code': () => codeDialog.close(),
         'apply-html': () => {
             if (!html.value.trim()) {
                 showResult('저장할 HTML을 입력해 주세요.');
