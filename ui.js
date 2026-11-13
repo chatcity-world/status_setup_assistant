@@ -36,6 +36,7 @@ const HTML_OPTIONS = `
         <textarea id="rp-theme-request" class="text_pole" rows="3" placeholder="예: 별이 빛나는 밤하늘, 남색 배경과 은색 글자" required></textarea>
         <p class="rp-status-hint">저장한 항목의 변수를 넣어 만듭니다. 현재 연결된 AI를 사용하며 API 사용량이 발생할 수 있습니다.</p>
         <button type="submit" class="menu_button">테마 생성</button>
+        <p class="rp-status-result rp-status-theme-result" role="status" data-theme-result></p>
     </form>
     <label class="rp-status-code-label" for="rp-status-html">상태창 테마 코드</label>
     <textarea class="text_pole rp-status-code" id="rp-status-html" rows="12" spellcheck="false"></textarea>
@@ -235,6 +236,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const builder = root.querySelector('[data-builder]');
     const themeDescription = root.querySelector('#rp-theme-request');
     const generateButton = builder.querySelector('button');
+    const themeResult = builder.querySelector('[data-theme-result]');
     let state;
     let settings;
     let editedAvatar;
@@ -274,6 +276,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
 
     function syncThemeBuilder() {
         generateButton.disabled = Boolean(themeGeneration);
+        generateButton.textContent = themeGeneration ? '생성 중…' : '테마 생성';
         html.readOnly = Boolean(themeGeneration);
     }
 
@@ -345,6 +348,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             }
             themeGeneration = undefined;
             themeDescription.value = '';
+            themeResult.textContent = '';
             builder.hidden = true;
             syncThemeBuilder();
             showResult('');
@@ -417,13 +421,16 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         event.preventDefault();
         if (!settings || themeGeneration) return;
         const description = themeDescription.value.trim();
-        if (!description) return;
+        if (!description) {
+            themeResult.textContent = '원하는 배경이나 색감을 한 줄로 적어 주세요.';
+            return;
+        }
         const original = html.value;
         const fieldSnapshot = JSON.stringify(settings.fields);
         const request = {};
         themeGeneration = request;
         syncThemeBuilder();
-        showResult('테마를 생성하고 있습니다…');
+        themeResult.textContent = '테마를 생성하고 있어요…';
         try {
             const code = await generateTheme(description, settings.fields);
             if (themeGeneration !== request) return;
@@ -431,10 +438,10 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             if (html.value !== original) throw new Error('코드가 변경되었습니다. 다시 생성해 주세요.');
             html.value = code;
             paintPreview();
-            showResult('생성했습니다. 미리보기를 확인한 뒤 저장 및 적용을 누르세요.');
+            themeResult.textContent = '테마를 만들었어요. 코드를 확인하고 저장 및 적용을 누르세요.';
         } catch (error) {
             if (themeGeneration === request) {
-                showResult(error.message || '테마 생성에 실패했습니다. AI 연결을 확인해 주세요.');
+                themeResult.textContent = error.message || '테마 생성에 실패했어요. 다시 시도해 주세요.';
             }
         } finally {
             if (themeGeneration === request) {

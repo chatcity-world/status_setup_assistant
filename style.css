@@ -411,6 +411,11 @@
 .rp-status-result { margin: 0; }
 .rp-status-result:empty { display: none; }
 
+.rp-status-theme-result {
+    margin-top: 6px;
+    overflow-wrap: anywhere;
+}
+
 .rp-status-preview {
     border-top: 1px solid var(--rp-ui-border);
     padding-top: 8px;
