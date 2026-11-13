@@ -256,5 +256,18 @@ export function createCardRenderer() {
 }
 ${css || ''}
 ${embeddedCSS}`;
+        if (sheet) {
+            if (currentCSS !== themeStyle) {
+                sheet.replaceSync(themeStyle);
+                currentCSS = themeStyle;
+            }
+            if (root.adoptedStyleSheets[0] !== sheet) root.adoptedStyleSheets = [sheet];
+            root.replaceChildren(fragment);
+        } else {
+            const style = document.createElement('style');
+            style.textContent = themeStyle;
+            root.replaceChildren(style, fragment);
+        }
+        painted.set(host, { fields, signature, html, css });
     };
 }
