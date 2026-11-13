@@ -59,11 +59,23 @@ function alignMessageCards() {
         const prose = textEdges(body, columns);
         const available = contentEdges(frame);
         if (Math.min(prose.right, available.right) <= Math.max(prose.left, available.left)) continue;
-        insets.push({ frame, left: Math.max(0, prose.left - available.left), right: Math.max(0, available.right - prose.right) });
+        const { fontFamily, fontSize, fontWeight, fontStyle, lineHeight } = getComputedStyle(body);
+        const lineRatio = Number.parseFloat(lineHeight) / Number.parseFloat(fontSize);
+        const typography = {
+            '--rp-status-font-family': fontFamily,
+            '--rp-status-font-size': fontSize,
+            '--rp-status-font-weight': fontWeight,
+            '--rp-status-font-style': fontStyle,
+            '--rp-status-line-height': Number.isFinite(lineRatio) ? String(lineRatio) : lineHeight,
+        };
+        insets.push({ frame, left: Math.max(0, prose.left - available.left), right: Math.max(0, available.right - prose.right), typography });
     }
-    for (const { frame, left, right } of insets) {
+    for (const { frame, left, right, typography } of insets) {
         frame.style.setProperty('--rp-status-text-left', `${left}px`);
         frame.style.setProperty('--rp-status-text-right', `${right}px`);
+        for (const [property, value] of Object.entries(typography)) {
+            if (value && frame.style.getPropertyValue(property) !== value) frame.style.setProperty(property, value);
+        }
     }
     if (!textResizeObserver) return;
     for (const column of observedColumns) {
@@ -334,6 +346,7 @@ eventSource.on(events.APP_INITIALIZED, initialize);
 eventSource.on(events.MESSAGE_RECEIVED, onReply);
 eventSource.on(events.MESSAGE_DELETED, requestRender);
 eventSource.on(events.MESSAGE_SWIPED, lockSwipe);
+if (events.SETTINGS_UPDATED) eventSource.on(events.SETTINGS_UPDATED, requestAlignment);
 eventSource.on(events.CHARACTER_RENAMED, (oldAvatar, newAvatar) => {
     const profiles = sharedSettings?.characterProfiles;
     const oldKey = profileKey(oldAvatar);

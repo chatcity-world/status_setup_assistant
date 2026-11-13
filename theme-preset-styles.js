@@ -6,9 +6,7 @@ const LCD = {
     item: 'border-radius:0;',
     thought: 'padding:8px 10px 9px;',
     gauge: 'padding:7px 9px;',
-    label: 'font:650 11px/1.5 system-ui,sans-serif;',
     labelColumn: '42px',
-    numbers: "font:700 13px/1.3 'Bitcount Prop Single','IBM Plex Mono',ui-monospace,monospace;",
     gaugeTrack: '-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 5px,transparent 5px 7px);mask-image:repeating-linear-gradient(90deg,#000 0 5px,transparent 5px 7px);',
 };
 
@@ -25,13 +23,12 @@ function lcdFooter(background, grid, ink) {
 }
 
 const SLACK = {
-    card: 'grid-template-columns:40px minmax(0,1fr);padding:0;gap:0;border-radius:12px;overflow:hidden;font-family:Inter,system-ui,sans-serif;',
+    card: 'grid-template-columns:40px minmax(0,1fr);padding:0;gap:0;border-radius:12px;overflow:hidden;',
     headerGroup: 'padding:2px 10px;border-radius:999px;',
     scene: 'padding:1px 0;border-radius:0;gap:5px;',
     item: 'border-radius:5px;',
     thought: 'padding:8px 10px;',
     gauge: 'padding:6px 9px;border-radius:999px;',
-    label: 'font:650 11px/1.5 Inter,system-ui,sans-serif;',
     labelColumn: '44px',
 };
 
@@ -57,7 +54,7 @@ export const THEME_PRESETS = {
             scene: 'padding:8px 11px;border:1px solid #ffffff40;box-shadow:inset 0 1px 0 #ffffff1f;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);',
             thought: 'padding:9px 12px 10px;border:1px solid #ffffff29;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);',
             labelColumn: '44px',
-            footer: '<div aria-hidden="true" style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 11px;padding:2px 0;font-size:14px;line-height:1.3"><span>🐟</span><span>🐠</span><span>🐡</span><span>🦈</span><span>🐬</span><span>🐋</span><span>🐳</span></div>',
+            footer: '<div aria-hidden="true" style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 11px;padding:2px 0"><span>🐟</span><span>🐠</span><span>🐡</span><span>🦈</span><span>🐬</span><span>🐋</span><span>🐳</span></div>',
         },
     },
     tamagotchi: {
@@ -80,14 +77,13 @@ export const THEME_PRESETS = {
         headerText: '#f5faf7', headerMuted: '#dfede5', scene: '#fafcfb', thought: '#f0f5f1',
         gaugeBackground: '#eaf4ed', gaugeText: '#245c3e', gaugeAccent: '#3c8258', gaugeTrack: '#d1e4d6',
         skin: {
-            card: 'gap:1px;padding:0;border:1px solid #5d806b;border-radius:12px;overflow:hidden;font-family:Inter,system-ui,sans-serif;',
+            card: 'gap:1px;padding:0;border:1px solid #5d806b;border-radius:12px;overflow:hidden;',
             header: 'gap:1px;background:#78a78c;',
             headerGroup: 'flex:1 1 114px;padding:7px 9px;border-radius:0;',
             scene: 'padding:0;gap:1px;border-radius:0;',
             item: 'border-radius:0;',
             thought: 'padding:9px 12px 10px;',
             gauge: 'padding:7px 9px;',
-            label: 'font:600 11px/1.5 Inter,system-ui,sans-serif;',
             labelColumn: '56px',
             cellLine: '#d6e0d9',
         },
@@ -123,6 +119,6 @@ export function slackRail({ rail, logo, channel }) {
     <span style="display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:${logo}">
       <span style="position:relative;width:19px;height:19px">${SLACK_LOGO}</span>
     </span>
-    <span data-rp-status-field="장소" data-rp-status-hide-empty style="display:grid;place-items:center;width:27px;height:27px;border-radius:7px;background:${channel};color:#fff;font-size:17px;font-weight:700">#</span>
+    <span data-rp-status-field="장소" data-rp-status-hide-empty style="display:grid;place-items:center;width:27px;min-height:27px;border-radius:7px;background:${channel};color:#fff">#</span>
   </div>`;
 }

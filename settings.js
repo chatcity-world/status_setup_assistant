@@ -1,5 +1,5 @@
 import { assignThemeVariables, DEFAULT_FIELDS } from './status.js';
-import { DEFAULT_HTML, DEFAULT_THEME, LEGACY_DEFAULT_HTML } from './theme.js';
+import { DEFAULT_HTML, DEFAULT_THEME, LEGACY_DEFAULT_HTML, PREVIOUS_DEFAULT_HTML } from './theme.js';
 import { syncThemeFields } from './theme-builder.js';
 import { getThemePreset, makeThemePreset, normalizeThemeLayout, THEME_PRESETS } from './theme-presets.js';
 
@@ -32,7 +32,7 @@ function copySettings(saved) {
     for (const [key, value] of Object.entries(defaults)) {
         settings[key] = structuredClone(saved?.[key] ?? value);
     }
-    if (settings.html === LEGACY_DEFAULT_HTML) settings.html = DEFAULT_HTML;
+    if (settings.html === LEGACY_DEFAULT_HTML || settings.html === PREVIOUS_DEFAULT_HTML) settings.html = DEFAULT_HTML;
     if (usesPreviousDefaults(settings)) {
         settings.fields = DEFAULT_FIELDS.map(field => ({ ...field, key: field.key === '호감도' ? '애정' : field.key }));
     }

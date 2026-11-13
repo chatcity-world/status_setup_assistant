@@ -1,5 +1,5 @@
 import { indexFields } from './status.js';
-import { escapeHtml, gaugeDisplay, themeVariableNames } from './theme.js';
+import { escapeHtml, gaugeDisplay, PRESET_FONT_SIZE, themeVariableNames } from './theme.js';
 import { slackRail, THEME_PRESETS } from './theme-preset-styles.js';
 
 export { THEME_PRESETS };
@@ -174,7 +174,7 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const [valueName, barName] = themeVariableNames(field).map(escapeHtml);
     let value = `{{${valueName}}}`;
     if (barName) {
-        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.numbers);
+        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
     const centeredLabel = item.align !== 'left' || field.key === '속마음';
@@ -184,11 +184,10 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const rowLayout = item.label && inlineLabel ? `display:grid;grid-template-columns:${labelColumn} minmax(0,1fr);align-items:baseline;gap:${cell ? 0 : 8}px;` : '';
     const roleStyle = field.key === '속마음' ? skin.thought : barName ? skin.gauge : '';
     const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${background === 'transparent' ? '1px 12px' : '11px 12px'};${skin.item ?? ''}${roleStyle ?? ''}`;
-    const font = compact && !item.label && ['날짜', '날씨'].includes(field.key) ? 'font-weight:650;' : '';
     const labelTone = compact ? palette.headerMuted ?? palette.muted : palette.muted;
     const color = customText || channel ? 'inherit' : labelTone;
     const labelName = escapeHtml(field.label || field.key);
-    const labelStyle = `font-size:10px;font-weight:600;${skin.label ?? ''}color:${color};${cell ? 'padding:6px 9px;' : ''}`;
+    const labelStyle = `color:${color};${cell ? 'padding:6px 9px;' : ''}`;
     const label = !item.label ? '' : channel
         ? `<dt style="${labelStyle}"><span aria-hidden="true"># </span><span data-rp-status-field-label>${labelName}</span></dt>`
         : `<dt data-rp-status-field-label style="${labelStyle}">${labelName}</dt>`;
@@ -201,9 +200,9 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const channelStyle = channel ? 'flex:1 1 148px;' : '';
     const cellStyle = cell ? `background:${background};` : '';
     const cellValue = cell ? `padding:6px 9px;${item.label && inlineLabel ? `border-inline-start:1px solid ${skin.cellLine};` : ''}` : '';
-    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${font}${flex}${channelStyle}margin:0;min-width:0;text-align:${item.align}">
+    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${flex}${channelStyle}margin:0;min-width:0;text-align:${item.align}">
       ${label}
-      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${muted}${numeric ? skin.numbers ?? '' : ''}">${value}</dd>
+      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${muted}">${value}</dd>
     </dl>`;
 }
 
@@ -265,7 +264,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
     const firstGroups = blocks[0]?.group === '1' && blocks[1]?.group === '2';
     const slackHeader = palette.slack && firstGroups && blocks[2]?.group === '3' && blocks[2].members[0].key === '장소';
     if (firstGroups && !slackHeader) {
-        const header = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 16px;font-variant-numeric:tabular-nums;${skin.header ?? ''}">
+        const header = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 16px;${skin.header ?? ''}">
     ${blocks[0].html}
     ${blocks[1].html}
   </div>`;
@@ -276,7 +275,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
         : palette.slack ? `${slackRail(palette.slack)}<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;padding:8px 11px 10px">${body}</div>`
             : [body, skin.footer].filter(Boolean).join('\n  ');
     const preset = palette.id ?? (palette.scheme === 'dark' ? 'dark' : 'white');
-    return `<section lang="ko" aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.cardBackground ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font:12px/1.55 system-ui,sans-serif;overflow-wrap:anywhere;${skin.card ?? ''}">
+    return `<section aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.cardBackground ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font-size:${PRESET_FONT_SIZE};overflow-wrap:anywhere;${skin.card ?? ''}">
   ${content}
 </section>`;
 }

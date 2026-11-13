@@ -1,9 +1,12 @@
 import { indexFields, normalizeValue } from './status.js';
 
-export const DEFAULT_HTML = `<section class="rp-card" aria-label="상태창" style="padding:14px;border-radius:12px;background:#fff3d9;color:#26110e;font:14px/1.5 system-ui,sans-serif">
+const PRESET_FONT_SCALE = 0.8;
+export const PRESET_FONT_SIZE = `${PRESET_FONT_SCALE * 100}%`;
+export const DEFAULT_HTML = `<section class="rp-card" aria-label="상태창" style="padding:14px;border-radius:12px;background:#fff3d9;color:#26110e;font-size:${PRESET_FONT_SIZE}">
   {{항목들}}
 </section>`;
-export const LEGACY_DEFAULT_HTML = DEFAULT_HTML.replace('  {{항목들}}', '  <div style="font-weight:700;margin-bottom:10px">상태창</div>\n  {{항목들}}');
+export const PREVIOUS_DEFAULT_HTML = DEFAULT_HTML.replace(`font-size:${PRESET_FONT_SIZE}`, 'font:14px/1.5 system-ui,sans-serif');
+export const LEGACY_DEFAULT_HTML = PREVIOUS_DEFAULT_HTML.replace('  {{항목들}}', '  <div style="font-weight:700;margin-bottom:10px">상태창</div>\n  {{항목들}}');
 
 export const PALETTES = {
     cream: { label: '버터 크림', background: '#fff3d9', accent: '#8b4b31' },
@@ -30,7 +33,6 @@ export function makeTheme({ background, accent, radius, layout }) {
   border-radius: var(--rp-radius);
   background: var(--rp-bg);
   color: var(--rp-ink);
-  font: 500 .875rem/1.45 system-ui, sans-serif;
   text-shadow: none;
 }
 
@@ -58,7 +60,7 @@ export function makeTheme({ background, accent, radius, layout }) {
 }
 
 .rp-field { min-width: 0; }
-.rp-label { font-size: .75em; opacity: .75; }
+.rp-label { opacity: .75; }
 .rp-value { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .rp-gauge {
@@ -143,12 +145,12 @@ function formatValue(field, value, compact = false) {
     return gaugeDisplay(bar, `${percent}%`);
 }
 
-function htmlFor(template, fields, values) {
+function htmlFor(template, fields, values, inheritFont) {
     const filled = fields.filter(field => field.enabled && Object.hasOwn(values, field.key));
     const rows = filled.map(field => {
         const detail = formatValue(field, values[field.key], true);
         return `<div class="rp-field" style="display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%">
-            <dt class="rp-label" style="flex:none;max-width:45%;font-size:.85em;opacity:.75;overflow-wrap:anywhere">${escapeHtml(field.label)}</dt>
+            <dt class="rp-label" style="flex:none;max-width:45%;${inheritFont ? '' : 'font-size:.85em;'}opacity:.75;overflow-wrap:anywhere">${escapeHtml(field.label)}</dt>
             <dd class="rp-value" style="min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd>
         </div>`;
     }).join('');
@@ -222,11 +224,13 @@ export function createCardRenderer() {
         const wrapper = document.createElement('div');
         wrapper.append(legacy.content);
         const outer = wrapper.firstElementChild;
+        const inheritFont = !css && !embeddedCSS && (html === DEFAULT_HTML
+            || Boolean(outer?.matches('[data-rp-status-preset]:not([data-rp-status-custom])')));
         const headings = wrapper.querySelectorAll('header, h1, h2, h3, h4, .rp-title');
         for (const title of [outer, outer?.firstElementChild, ...headings]) {
             if (title?.textContent.trim() === '상태창') title.remove();
         }
-        const fragment = SillyTavern.libs.DOMPurify.sanitize(htmlFor(wrapper.innerHTML, fields, values), {
+        const fragment = SillyTavern.libs.DOMPurify.sanitize(htmlFor(wrapper.innerHTML, fields, values, inheritFont), {
             ALLOWED_TAGS: HTML_TAGS,
             ALLOWED_ATTR: HTML_ATTRIBUTES,
             ALLOW_DATA_ATTR: false,
@@ -235,8 +239,21 @@ export function createCardRenderer() {
         for (const element of fragment.children) {
             // Fit the outer theme to the host column, including older fixed-width themes.
             for (const [property, value] of outerStyles) element.style.setProperty(property, value, 'important');
+            // Older saved presets can still have inline fonts.
+            if (inheritFont) element.classList.add('rp-status-inherit-font');
         }
         const themeStyle = `${baseCSS}
+.rp-status-inherit-font {
+    font: inherit !important;
+    font-family: var(--rp-status-font-family, var(--mainFontFamily, inherit)) !important;
+    font-size: calc(var(--rp-status-font-size, var(--mainFontSize, 1em)) * ${PRESET_FONT_SCALE}) !important;
+    font-style: var(--rp-status-font-style, inherit) !important;
+    font-weight: var(--rp-status-font-weight, inherit) !important;
+    line-height: var(--rp-status-line-height, inherit) !important;
+}
+.rp-status-inherit-font :where(*) {
+    font: inherit !important;
+}
 :where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge {
     -webkit-appearance: none;
     appearance: none;
