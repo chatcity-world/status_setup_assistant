@@ -50,7 +50,7 @@ export const THEME_PRESETS = {
         id: 'ocean', label: '바다', scheme: 'dark', swatch: 'linear-gradient(180deg,#002C5F,#0A66B1)',
         background: '#002c5f', cardBackground: 'linear-gradient(180deg,#002C5F 0%,#0A66B1 100%)',
         text: '#ffffff', muted: '#e1eeff', scene: '#225c90', sceneBackground: '#e7f4ff17', thought: '#1a64ae',
-        gaugeText: '#ffffff', gaugeAccent: '#a8d7ff', gaugeTrack: '#ffffff4d',
+        gaugeText: '#ffffff', gaugeAccent: '#a8d7ff', gaugeTrack: '#ffffff',
         skin: {
             card: 'padding:13px 13px 9px;gap:9px;overflow:hidden;',
             headerGroup: 'padding:0 2px 2px;',
