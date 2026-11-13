@@ -1,0 +1,11 @@
+{
+  "display_name": "RP 상태창",
+  "author": "Gamja",
+  "version": "1.6.1",
+  "minimum_client_version": "1.19.0",
+  "loading_order": 35,
+  "js": "index.js",
+  "css": "style.css",
+  "generate_interceptor": "gamjaRpStatusPrepareGeneration",
+  "auto_update": false
+}
