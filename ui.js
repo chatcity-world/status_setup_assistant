@@ -1,6 +1,7 @@
 import { generateTheme, combinedCode, syncThemeFields } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
 import { DEFAULT_HTML, themeVariableNames } from './theme.js';
+import { makeThemePreset, THEME_PRESETS } from './theme-presets.js';
 import { createFieldKey, indexFields } from './status.js';
 
 const DISPLAY_OPTIONS = `
@@ -30,27 +31,43 @@ const FIELD_OPTIONS = `
     </form>`;
 
 const HTML_OPTIONS = `
-    <div class="rp-status-actions"><button class="menu_button" type="button" data-action="open-builder">직접 만들기</button></div>
-    <form data-builder hidden>
-        <label for="rp-theme-request">원하는 테마</label>
-        <textarea id="rp-theme-request" class="text_pole" rows="3" placeholder="예: 별이 빛나는 밤하늘, 남색 배경과 은색 글자" required></textarea>
-        <p class="rp-status-hint">저장한 항목의 변수를 넣어 만듭니다. 현재 연결된 AI를 사용하며 API 사용량이 발생할 수 있습니다.</p>
-        <button type="submit" class="menu_button">테마 생성</button>
-        <p class="rp-status-result rp-status-theme-result" role="status" data-theme-result></p>
-    </form>
-    <label class="rp-status-code-label" for="rp-status-html">상태창 테마 코드</label>
-    <textarea class="text_pole rp-status-code" id="rp-status-html" rows="12" spellcheck="false"></textarea>
-    <p class="rp-status-hint">HTML 태그의 style 속성에 디자인을 작성합니다. 변수는 {{장소}}처럼 넣습니다.</p>
-    <div class="rp-status-actions">
-        <button class="menu_button" type="button" data-action="apply-html">저장 및 적용</button>
-        <button class="menu_button" type="button" data-action="copy-html">코드 복사</button>
-        <button class="menu_button" type="button" data-action="reset-html">기본 코드</button>
+    <div class="rp-status-preview">
+        <div class="rp-status-preview-label" data-preview-label>미리보기</div>
+        <div data-preview-card></div>
     </div>
     <details class="rp-status-variables">
         <summary>사용할 수 있는 변수</summary>
         <p class="rp-status-hint">표시 이름으로 값 변수를 만들어요. 게이지 형식에는 막대 변수도 생겨요.</p>
         <dl data-theme-variables></dl>
-    </details>`;
+    </details>
+    <fieldset class="rp-status-theme-presets">
+        <legend>테마</legend>
+        <div class="rp-status-theme-choices">
+            ${Object.entries(THEME_PRESETS).map(([key, preset]) => `
+                <button class="rp-status-theme-choice" type="button" data-theme-preset="${key}" aria-pressed="false">
+                    <span class="rp-status-theme-swatch" style="background:${preset.swatch}" aria-hidden="true"></span>
+                    ${preset.label}
+                </button>`).join('')}
+        </div>
+    </fieldset>
+    <div class="rp-status-code-editor">
+        <div class="rp-status-code-heading">
+            <label for="rp-status-html">상태창 테마 코드</label>
+            <button class="menu_button" type="button" data-action="open-builder" aria-expanded="false" aria-controls="rp-status-theme-builder">직접 만들기</button>
+        </div>
+        <form id="rp-status-theme-builder" data-builder hidden>
+            <label for="rp-theme-request">원하는 테마</label>
+            <textarea id="rp-theme-request" class="text_pole" rows="3" placeholder="예: 별이 빛나는 밤하늘, 남색 배경과 은색 글자" required></textarea>
+            <p class="rp-status-hint">저장한 항목의 변수를 넣어 만듭니다. 현재 연결된 AI를 사용하며 API 사용량이 발생할 수 있습니다.</p>
+            <button type="submit" class="menu_button">테마 생성</button>
+            <p class="rp-status-result rp-status-theme-result" role="status" data-theme-result></p>
+        </form>
+        <textarea class="text_pole rp-status-code" id="rp-status-html" rows="12" spellcheck="false"></textarea>
+        <div class="rp-status-actions rp-status-code-actions">
+            <button class="menu_button" type="button" data-action="apply-html">저장 및 적용</button>
+            <button class="menu_button" type="button" data-action="copy-html">코드 복사</button>
+        </div>
+    </div>`;
 
 const TABS = [
     ['display', '표시', DISPLAY_OPTIONS],
@@ -58,7 +75,7 @@ const TABS = [
     ['html', '테마 코드', HTML_OPTIONS],
 ];
 
-function setupTabs(root) {
+function setupTabs(root, onSelect) {
     const tabs = [...root.querySelectorAll('[role="tab"]')];
     function select(index, focus = false) {
         tabs.forEach((tab, i) => {
@@ -69,6 +86,7 @@ function setupTabs(root) {
         });
         root.querySelector('[data-editor-result]').textContent = '';
         if (focus) tabs[index].focus();
+        onSelect();
     }
     tabs.forEach((tab, index) => {
         tab.addEventListener('click', () => select(index));
@@ -236,15 +254,10 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
                 </div>
                 ${TABS.map(([key, , content]) => `<section role="tabpanel" id="rp-status-panel-${key}" aria-labelledby="rp-status-tab-${key}" hidden>${content}</section>`).join('')}
                 <p class="rp-status-result" role="status" data-editor-result></p>
-                <div class="rp-status-preview">
-                    <div class="rp-status-preview-label" data-preview-label>미리보기</div>
-                    <div data-preview-card></div>
-                </div>
             </div>
         </div>`;
     content.append(root);
     target.append(drawer);
-    setupTabs(root);
 
     const scope = root.querySelector('#rp-status-scope');
     const characterScopeInput = scope.querySelector('[value="character"]');
@@ -264,12 +277,15 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const profileResult = root.querySelector('[data-profile-result]');
     const profileEditor = root.querySelector('[data-profile-editor]');
     const html = root.querySelector('#rp-status-html');
+    const themePanel = root.querySelector('#rp-status-panel-html');
     const previewCard = root.querySelector('[data-preview-card]');
     const previewLabel = root.querySelector('[data-preview-label]');
     const result = root.querySelector('[data-editor-result]');
     const fields = root.querySelector('[data-field-list]');
     const variables = root.querySelector('[data-theme-variables]');
     const builder = root.querySelector('[data-builder]');
+    const builderToggle = root.querySelector('[data-action="open-builder"]');
+    const presetButtons = [...root.querySelectorAll('[data-theme-preset]')];
     const themeDescription = root.querySelector('#rp-theme-request');
     const generateButton = builder.querySelector('button');
     const themeResult = builder.querySelector('[data-theme-result]');
@@ -282,12 +298,14 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     let themeGeneration;
     let previewValues = {};
     let previewFrame = 0;
+    let presetFields;
+    let presetCodes;
 
     function paintPreview() {
-        if (!settings || !icon.classList.contains('up') || previewFrame) return;
+        if (!settings || themePanel.hidden || !icon.classList.contains('up') || previewFrame) return;
         previewFrame = requestAnimationFrame(() => {
             previewFrame = 0;
-            if (!settings) return;
+            if (!settings || themePanel.hidden || !icon.classList.contains('up')) return;
             const hasValues = settings.fields.some(field => field.enabled && Object.hasOwn(previewValues, field.key));
             previewLabel.textContent = hasValues ? '미리보기' : '미리보기 · 예시 값';
             const values = hasValues ? previewValues : Object.fromEntries(settings.fields.filter(field => field.enabled).map(field => {
@@ -296,6 +314,24 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             }));
             renderCard(previewCard, settings.fields, values, html.value || DEFAULT_HTML, '');
         });
+    }
+
+    function syncPresetSelection() {
+        if (settings && presetFields !== settings.fields) {
+            presetFields = settings.fields;
+            presetCodes = Object.fromEntries(Object.entries(THEME_PRESETS).map(([key, preset]) => [key, makeThemePreset(preset, presetFields)]));
+        }
+        const code = html.value.trim();
+        for (const button of presetButtons) {
+            const selected = settings && code === presetCodes[button.dataset.themePreset];
+            button.setAttribute('aria-pressed', String(Boolean(selected)));
+        }
+    }
+
+    function updateThemeDraft(code) {
+        html.value = code;
+        syncPresetSelection();
+        paintPreview();
     }
 
     function syncControls() {
@@ -314,6 +350,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         generateButton.disabled = Boolean(themeGeneration);
         generateButton.textContent = themeGeneration ? '생성 중…' : '테마 생성';
         html.readOnly = Boolean(themeGeneration);
+        for (const button of presetButtons) button.disabled = Boolean(themeGeneration);
     }
 
     function syncCharacters() {
@@ -375,7 +412,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         if (settings !== next || editedAvatar !== avatar) {
             editedAvatar = avatar;
             settings = next;
-            html.value = next ? combinedCode(next) : '';
+            updateThemeDraft(next ? combinedCode(next) : '');
             fields.replaceChildren();
             if (next) {
                 for (const field of next.fields) addFieldRow(fields, field);
@@ -386,6 +423,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             themeDescription.value = '';
             themeResult.textContent = '';
             builder.hidden = true;
+            builderToggle.setAttribute('aria-expanded', 'false');
             syncThemeBuilder();
             showResult('');
         }
@@ -463,7 +501,17 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         if (open) syncPanel();
     });
     drawerObserver.observe(icon, { attributes: true, attributeFilter: ['class'] });
-    html.addEventListener('input', paintPreview);
+    html.addEventListener('input', () => {
+        syncPresetSelection();
+        paintPreview();
+    });
+    for (const button of presetButtons) {
+        button.addEventListener('click', () => {
+            if (!settings || themeGeneration) return;
+            updateThemeDraft(presetCodes[button.dataset.themePreset]);
+            showResult('');
+        });
+    }
     builder.addEventListener('submit', async event => {
         event.preventDefault();
         if (!settings || themeGeneration) return;
@@ -483,8 +531,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             if (themeGeneration !== request) return;
             if (fieldSnapshot !== JSON.stringify(settings.fields)) throw new Error('생성 중 항목이 변경되었습니다. 다시 생성해 주세요.');
             if (html.value !== original) throw new Error('코드가 변경되었습니다. 다시 생성해 주세요.');
-            html.value = code;
-            paintPreview();
+            updateThemeDraft(code);
             themeResult.textContent = '테마를 만들었어요. 코드를 확인하고 저장 및 적용을 누르세요.';
         } catch (error) {
             if (themeGeneration === request) {
@@ -527,9 +574,8 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         if (!saveChanges({ fields: newFields })) return;
         rows.forEach((row, index) => { row.dataset.key = settings.fields[index].key; });
         showThemeVariables(variables, settings.fields);
-        html.value = editedCode === savedCode ? combinedCode(settings) : syncThemeFields(editedCode, previousFields, settings.fields);
+        updateThemeDraft(editedCode === savedCode ? combinedCode(settings) : syncThemeFields(editedCode, previousFields, settings.fields));
         showResult('항목을 저장했습니다.');
-        paintPreview();
     });
 
     const actions = {
@@ -541,17 +587,13 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
                 return;
             }
             if (saveChanges({ html: html.value, css: '' })) {
-                html.value = combinedCode(settings);
+                updateThemeDraft(combinedCode(settings));
                 showResult('HTML을 저장했습니다.');
             }
         },
-        'reset-html': () => {
-            html.value = DEFAULT_HTML;
-            paintPreview();
-            showResult('기본 HTML을 불러왔습니다.');
-        },
         'open-builder': () => {
             builder.hidden = !builder.hidden;
+            builderToggle.setAttribute('aria-expanded', String(!builder.hidden));
             if (!builder.hidden) themeDescription.focus();
         },
         'copy-html': async () => {
@@ -564,6 +606,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     for (const button of root.querySelectorAll('[data-action]')) {
         button.addEventListener('click', actions[button.dataset.action]);
     }
+    setupTabs(root, paintPreview);
 
     return next => {
         state = next;

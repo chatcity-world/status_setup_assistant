@@ -316,7 +316,8 @@
 }
 
 .rp-status-selects {
-    grid-template-columns: repeat(auto-fit, minmax(min(115px, 100%), 1fr));
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
 }
 
 .rp-status-selects label,
@@ -410,10 +411,91 @@
     white-space: normal;
 }
 
-.rp-status-code-label {
-    display: block;
-    margin-block: 5px;
+.rp-status-settings #rp-status-panel-html,
+.rp-status-code-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+
+.rp-status-theme-presets {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.rp-status-theme-presets legend,
+.rp-status-code-heading label {
+    width: auto;
+    margin: 0;
+    padding: 0;
     font-weight: 650;
+}
+
+.rp-status-theme-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.rp-status-theme-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+}
+
+.rp-status-theme-choice:hover,
+.rp-status-theme-choice[aria-pressed="true"] {
+    background: var(--rp-ui-soft);
+}
+
+.rp-status-theme-choice[aria-pressed="true"] {
+    border-color: var(--rp-ui-border);
+    font-weight: 650;
+}
+
+.rp-status-theme-choice:disabled { opacity: .55; cursor: default; }
+
+.rp-status-theme-swatch {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border: 1px solid #8b8e94;
+    border-radius: 50%;
+}
+
+.rp-status-code-editor {
+    gap: 8px;
+    border-top: 1px solid var(--rp-ui-border);
+    padding-top: 10px;
+}
+
+.rp-status-code-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px 8px;
+}
+
+.rp-status-settings .rp-status-code-heading .menu_button { margin-inline-start: auto; }
+.rp-status-code-actions { margin: 0; }
+
+.rp-status-code-editor [data-builder] {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
 }
 
 .rp-status-variables dl {
@@ -451,8 +533,6 @@
 }
 
 .rp-status-preview {
-    border-top: 1px solid var(--rp-ui-border);
-    padding-top: 8px;
     width: 100%;
     min-width: 0;
 }
@@ -469,5 +549,7 @@
     .rp-status-settings .rp-status-code,
     .rp-status-settings :is(input[type="text"], input:not([type]), select, textarea) { font-size: 16px; }
     .rp-status-settings .rp-status-field-editor :is(.rp-status-field-enabled, .menu_button),
-    .rp-status-settings .rp-status-field-actions .menu_button { min-height: 44px; }
+    .rp-status-settings .rp-status-field-actions .menu_button,
+    .rp-status-settings .rp-status-theme-choice,
+    .rp-status-settings .rp-status-code-editor .menu_button { min-height: 44px; }
 }

@@ -94,7 +94,7 @@ const HTML_ATTRIBUTES = ['style', 'alt', 'class', 'colspan', 'height', 'href', '
     'rowspan', 'src', 'title', 'value', 'width'];
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ESCAPES[char]);
 }
 
@@ -159,6 +159,9 @@ function htmlFor(template, fields, values) {
         const key = row.dataset.rpStatusField;
         const field = variables.get(key);
         if (!field?.enabled || field.key !== key) row.remove();
+    }
+    for (const group of [...source.content.querySelectorAll('[data-rp-status-group]')].reverse()) {
+        if (!group.childElementCount) group.remove();
     }
     const walker = document.createTreeWalker(source.content, NodeFilter.SHOW_TEXT);
     const nodes = [];
