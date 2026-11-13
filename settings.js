@@ -1,5 +1,6 @@
-import { DEFAULT_FIELDS } from './status.js';
+import { assignThemeVariables, DEFAULT_FIELDS } from './status.js';
 import { DEFAULT_HTML, DEFAULT_THEME, LEGACY_DEFAULT_HTML } from './theme.js';
+import { syncThemeFields } from './theme-builder.js';
 
 const defaults = {
     enabled: true,
@@ -29,11 +30,11 @@ function copySettings(saved) {
     }
     if (settings.html === LEGACY_DEFAULT_HTML) settings.html = DEFAULT_HTML;
     if (usesPreviousDefaults(settings)) {
-        // Keep the original affection key so previously recorded values still render.
-        settings.fields = DEFAULT_FIELDS.map(field => ({
-            ...field, key: field.key === '호감도' ? '애정' : field.key,
-        }));
+        settings.fields = DEFAULT_FIELDS.map(field => ({ ...field, key: field.key === '호감도' ? '애정' : field.key }));
     }
+    const fields = assignThemeVariables(settings.fields);
+    settings.html = syncThemeFields(settings.html, settings.fields, fields);
+    settings.fields = fields;
     return settings;
 }
 
@@ -72,6 +73,11 @@ export function saveCharacterProfile(shared, avatar) {
 export function saveProfileSettings(shared, avatar, changes) {
     const settings = avatar ? getCharacterProfile(shared, avatar)?.settings : shared;
     if (!settings) return false;
+    if (changes.fields || changes.html !== undefined) {
+        const fields = changes.fields ? assignThemeVariables(changes.fields) : settings.fields;
+        const html = syncThemeFields(changes.html ?? settings.html, settings.fields, fields);
+        changes = { ...changes, fields, html };
+    }
     Object.assign(settings, changes);
     return true;
 }

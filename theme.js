@@ -1,3 +1,5 @@
+import { indexFields, normalizeValue } from './status.js';
+
 export const DEFAULT_HTML = `<section class="rp-card" aria-label="상태창" style="padding:14px;border-radius:12px;background:#fff3d9;color:#26110e;font:14px/1.5 system-ui,sans-serif">
   {{항목들}}
 </section>`;
@@ -98,45 +100,92 @@ function escapeHtml(value) {
 
 function gauge(label, value, compact = false) {
     const layout = compact ? 'display:inline-block;width:40px;max-width:100%;vertical-align:middle' : 'width:100%';
-    return `<progress class="rp-gauge" style="${layout};height:6px;accent-color:currentColor" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
+    return `<progress class="rp-gauge" style="${layout};min-width:0;height:6px;accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
+}
+
+export function gaugeDisplay(bar, percent) {
+    return `<span class="rp-gauge-display" style="display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px">
+        <span style="display:flex;align-items:center;min-width:0;height:6px;overflow:hidden;border-radius:999px;background:var(--rp-gauge-track,transparent)">${bar}</span>
+        <span style="font-variant-numeric:tabular-nums;white-space:nowrap">${percent}</span>
+    </span>`;
+}
+
+const DISPLAY_PREFIX = '표시:';
+const GAUGE_SUFFIX = '_게이지';
+
+export function themeVariableNames(field) {
+    const name = field.variable ?? field.key;
+    return field.type === 'gauge' ? [name, name + GAUGE_SUFFIX] : [name];
+}
+
+export function resolveThemeField(token, byKey, includeHidden = false) {
+    let format = 'value';
+    let key = token;
+    if (token.startsWith(DISPLAY_PREFIX)) {
+        format = 'display';
+        key = token.slice(DISPLAY_PREFIX.length).trim();
+    } else if (token.endsWith(GAUGE_SUFFIX)) {
+        format = 'gauge';
+        key = token.slice(0, -GAUGE_SUFFIX.length);
+    }
+    const field = byKey.get(key);
+    if (!field || (!includeHidden && !field.enabled) || (format === 'gauge' && field.type !== 'gauge')) return undefined;
+    return { field, format };
+}
+
+function formatValue(field, value, compact = false) {
+    if (value == null) return '—';
+    if (field.type !== 'gauge') return escapeHtml(value);
+    const percent = normalizeValue(field, value);
+    if (percent == null) return '—';
+    const bar = gauge(field.label, percent, compact);
+    if (compact) return `${percent}% ${bar}`;
+    return gaugeDisplay(bar, `${percent}%`);
 }
 
 function htmlFor(template, fields, values) {
     const filled = fields.filter(field => field.enabled && Object.hasOwn(values, field.key));
-    const rows = filled.map(({ key, label, type }) => {
-        const value = values[key];
-        const detail = type === 'gauge' ? `${value}% ${gauge(label, value, true)}` : escapeHtml(value);
+    const rows = filled.map(field => {
+        const detail = formatValue(field, values[field.key], true);
         return `<div class="rp-field" style="display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%">
-            <dt class="rp-label" style="flex:none;max-width:45%;font-size:.85em;opacity:.75;overflow-wrap:anywhere">${escapeHtml(label)}</dt>
+            <dt class="rp-label" style="flex:none;max-width:45%;font-size:.85em;opacity:.75;overflow-wrap:anywhere">${escapeHtml(field.label)}</dt>
             <dd class="rp-value" style="min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd>
         </div>`;
     }).join('');
-    const variables = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
+    const variables = indexFields(fields);
     const source = document.createElement('template');
     source.innerHTML = template;
+    for (const row of source.content.querySelectorAll('[data-rp-status-field]')) {
+        const key = row.dataset.rpStatusField;
+        const field = variables.get(key);
+        if (!field?.enabled || field.key !== key) row.remove();
+    }
     const walker = document.createTreeWalker(source.content, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
         if (walker.currentNode.data.includes('{{')) nodes.push(walker.currentNode);
     }
     let renderedFields = false;
-    function resolve(key) {
+    function resolve(key, percent = '') {
         if (key === '항목들') {
             if (renderedFields) return '';
             renderedFields = true;
             return rows ? `<dl class="rp-grid" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0">${rows}</dl>` : '<p class="rp-empty">아직 입력된 상태가 없어요.</p>';
         }
-        if (key.endsWith('_게이지')) {
-            const valueKey = key.slice(0, -'_게이지'.length);
-            const field = variables.get(valueKey);
-            return field?.type === 'gauge' && Object.hasOwn(values, valueKey) ? gauge(field.label, values[valueKey]) : '';
+        const resolved = resolveThemeField(key, variables);
+        if (!resolved) return '';
+        const { field, format } = resolved;
+        const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined;
+        if (format === 'gauge') {
+            const percent = normalizeValue(field, value);
+            return percent == null ? '' : gauge(field.label, percent);
         }
-        if (!variables.has(key)) return '';
-        return Object.hasOwn(values, key) ? escapeHtml(values[key]) : '—';
+        if (format === 'display') return formatValue(field, value);
+        return value == null ? '—' : escapeHtml(String(value) + percent);
     }
     for (const node of nodes) {
         const replacement = document.createElement('template');
-        replacement.innerHTML = escapeHtml(node.data).replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (_, key) => resolve(key));
+        replacement.innerHTML = escapeHtml(node.data).replace(/\{\{\s*([^{}]+?)\s*\}\}(\s*%)?/g, (_, key, percent) => resolve(key, percent));
         node.replaceWith(replacement.content);
     }
     return source.innerHTML;

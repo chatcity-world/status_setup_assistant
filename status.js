@@ -35,7 +35,46 @@ export function createFieldKey(label, used) {
     return key;
 }
 
-function normalizeValue(field, value) {
+export function indexFields(fields, includeLegacyNames = true) {
+    const byKey = new Map(fields.map(field => [field.key, field]));
+    for (const field of fields) {
+        for (const name of [field.variable, ...(field.variableAliases ?? [])]) {
+            if (validKey(name) && !byKey.has(name)) byKey.set(name, field);
+        }
+    }
+    // Older profiles and chat updates use 애정 for the built-in 호감도 field.
+    if (includeLegacyNames) {
+        if (!byKey.has('호감도') && byKey.has('애정')) byKey.set('호감도', byKey.get('애정'));
+        if (!byKey.has('애정') && byKey.has('호감도')) byKey.set('애정', byKey.get('호감도'));
+    }
+    return byKey;
+}
+
+export function assignThemeVariables(fields) {
+    const claims = indexFields(fields, false);
+    const namesByField = new Map(fields.map(field => [field, []]));
+    for (const [name, field] of claims) namesByField.get(field).push(name);
+    const used = new Set(claims.keys());
+
+    return fields.map(field => {
+        const { variable: previous, variableAliases = [], ...saved } = field;
+        const owned = namesByField.get(field);
+        for (const name of owned) used.delete(name);
+        const variable = createFieldKey(field.label || field.key, used);
+        for (const name of owned) used.add(name);
+        used.add(variable);
+
+        // Keep the original key for chat history and previous names for saved themes.
+        const aliases = new Set([...variableAliases, previous].filter(validKey));
+        aliases.delete(field.key);
+        aliases.delete(variable);
+        if (variable !== field.key) saved.variable = variable;
+        if (aliases.size) saved.variableAliases = [...aliases];
+        return saved;
+    });
+}
+
+export function normalizeValue(field, value) {
     if (value === null || (typeof value === 'string' && !value.trim())) return null;
     if (field.type === 'gauge') {
         const number = typeof value === 'string' && /^-?\d+(?:\.\d+)?\s*%?$/.test(value.trim())
@@ -48,11 +87,12 @@ function normalizeValue(field, value) {
     return undefined;
 }
 
-function cleanPatch(input, fields) {
+function cleanPatch(entries, byKey) {
     const result = {};
-    for (const field of fields) {
-        if (!input || !Object.hasOwn(input, field.key)) continue;
-        const value = normalizeValue(field, input[field.key]);
+    for (const [key, raw] of entries) {
+        const field = byKey.get(key);
+        if (!field) continue;
+        const value = normalizeValue(field, raw);
         if (value !== undefined) result[field.key] = value;
     }
     return result;
@@ -95,32 +135,38 @@ export function stripStatus(text, streaming = false) {
 
 const parsedMessages = new WeakMap();
 
-function getRawPatch(message) {
+function getRawEntries(message) {
     const text = typeof message.mes === 'string' ? message.mes : '';
-    if (!HAS_PROTOCOL.test(text)) return {};
+    if (!HAS_PROTOCOL.test(text)) return [];
     const cached = parsedMessages.get(message);
-    if (cached?.text === text) return cached.patch;
+    if (cached?.text === text) return cached.entries;
 
-    const patch = Object.create(null);
+    const entries = new Map();
     for (const match of text.matchAll(PROTOCOL)) {
         const [, body, closing] = match;
         if (!closing) continue;
         const json = body.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1');
         try {
             const value = JSON.parse(json);
-            if (value && typeof value === 'object' && !Array.isArray(value)) Object.assign(patch, value);
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                for (const [key, raw] of Object.entries(value)) {
+                    // Keep the latest occurrence of each key in reply order, including aliases.
+                    entries.delete(key);
+                    entries.set(key, raw);
+                }
+            }
         } catch {
             // A partial or malformed update does not change the scene.
         }
     }
-    parsedMessages.set(message, { text, patch });
-    return patch;
+    parsedMessages.set(message, { text, entries });
+    return entries;
 }
 
-export function aiPatch(message, fields) {
+export function aiPatch(message, fields, byKey = indexFields(fields)) {
     const decision = message.extra?.[AI_KEY];
-    const parsed = decision?.ignore ? {} : getRawPatch(message);
-    return { ...cleanPatch(decision?.base, fields), ...cleanPatch(parsed, fields) };
+    const base = cleanPatch(Object.entries(decision?.base ?? {}), byKey);
+    return decision?.ignore ? base : { ...base, ...cleanPatch(getRawEntries(message), byKey) };
 }
 
 export function isAssistant(message) {
@@ -136,22 +182,23 @@ export function timeline(chat, fields, streamingId = -1, locked = null) {
     let values = {};
     let previousReply = {};
     const cards = new Map();
+    const byKey = indexFields(fields);
 
     for (let id = 0; id < chat.length; id++) {
         const message = chat[id];
         if (!message) continue;
         // Replay values committed by older versions so existing chat history still renders.
-        const legacy = cleanPatch(message[LEGACY_MANUAL_KEY], fields);
+        const legacy = cleanPatch(Object.entries(message[LEGACY_MANUAL_KEY] ?? {}), byKey);
         if (Object.keys(legacy).length) values = applyPatch(values, legacy);
         if (locked?.has(message)) {
-            values = applyPatch(values, cleanPatch(locked.get(message), fields));
+            values = applyPatch(values, cleanPatch(Object.entries(locked.get(message) ?? {}), byKey));
             previousReply = values;
             continue;
         }
         if (id === streamingId) continue;
         if (!isReply(message)) continue;
 
-        const automatic = aiPatch(message, fields);
+        const automatic = aiPatch(message, fields, byKey);
         if (Object.keys(automatic).length) values = applyPatch(values, automatic);
         cards.set(id, { values, changed: different(previousReply, values, fields) });
         previousReply = values;
@@ -168,13 +215,13 @@ export function promptFor(values, fields, { character, user } = {}) {
     const active = fields.filter(field => field.enabled);
     if (!active.length) return '';
     const current = Object.fromEntries(active.filter(field => Object.hasOwn(values, field.key))
-        .map(field => [field.key, values[field.key]]));
-    const keys = active.map(field => `${field.key}${field.type === 'gauge' ? ' (integer 0–100)' : ''}`).join(', ');
-    const labels = active.filter(field => field.label && field.label !== field.key)
-        .map(field => [field.key, field.label]);
+        .map(field => [field.variable ?? field.key, values[field.key]]));
+    const keys = active.map(field => `${field.variable ?? field.key}${field.type === 'gauge' ? ' (integer 0–100)' : ''}`).join(', ');
+    const labels = active.filter(field => field.label && field.label !== (field.variable ?? field.key))
+        .map(field => [field.variable ?? field.key, field.label]);
     const names = { char: character || '답변하는 캐릭터', user: user || '사용자' };
     const rules = active.filter(field => typeof field.rule === 'string' && field.rule.trim())
-        .map(({ key, rule }) => [key, rule.trim().replace(/\{\{\s*(char|user)\s*\}\}/gi, (_, name) => names[name.toLowerCase()])]);
+        .map(({ key, variable, rule }) => [variable ?? key, rule.trim().replace(/\{\{\s*(char|user)\s*\}\}/gi, (_, name) => names[name.toLowerCase()])]);
     return [
         `Current roleplay scene state (JSON data): ${promptJson(current)}`,
         `Allowed state keys: ${keys}.`,

@@ -1,7 +1,7 @@
-import { generateTheme, combinedCode } from './theme-builder.js';
+import { generateTheme, combinedCode, syncThemeFields } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
-import { DEFAULT_HTML } from './theme.js';
-import { createFieldKey } from './status.js';
+import { DEFAULT_HTML, themeVariableNames } from './theme.js';
+import { createFieldKey, indexFields } from './status.js';
 
 const DISPLAY_OPTIONS = `
     <div class="rp-status-selects">
@@ -48,6 +48,7 @@ const HTML_OPTIONS = `
     </div>
     <details class="rp-status-variables">
         <summary>사용할 수 있는 변수</summary>
+        <p class="rp-status-hint">표시 이름으로 값 변수를 만들어요. 게이지 형식에는 막대 변수도 생겨요.</p>
         <dl data-theme-variables></dl>
     </details>`;
 
@@ -134,8 +135,8 @@ function addFieldRow(container, field = { label: '', type: 'text', enabled: true
 
 function showThemeVariables(list, fields) {
     const entries = [['값이 있는 표시 항목 전체', ['항목들']]];
-    for (const { key, label, type, enabled } of fields) {
-        if (enabled) entries.push([label, type === 'gauge' ? [key, key + '_게이지'] : [key]]);
+    for (const field of fields) {
+        if (field.enabled) entries.push([field.label, themeVariableNames(field)]);
     }
     list.replaceChildren(...entries.flatMap(([label, keys]) => {
         const name = document.createElement('dt');
@@ -501,7 +502,9 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         event.preventDefault();
         if (!settings) return;
         const rows = [...fields.children];
-        const used = new Set(settings.fields.map(field => field.key));
+        const existing = indexFields(settings.fields, false);
+        const previousFields = settings.fields;
+        const used = new Set(existing.keys());
         const newFields = [];
         for (const row of rows) {
             const inputs = Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input]));
@@ -514,11 +517,17 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             const key = row.dataset.key || createFieldKey(label, used);
             const rule = inputs.rule.value.trim();
             used.add(key);
-            newFields.push({ key, label, type: inputs.type.value, enabled: inputs.enabled.checked, ...(rule && { rule }) });
+            const field = { ...existing.get(key), key, label, type: inputs.type.value, enabled: inputs.enabled.checked };
+            if (rule) field.rule = rule;
+            else delete field.rule;
+            newFields.push(field);
         }
+        const savedCode = combinedCode(settings);
+        const editedCode = html.value;
         if (!saveChanges({ fields: newFields })) return;
-        rows.forEach((row, index) => { row.dataset.key = newFields[index].key; });
-        showThemeVariables(variables, newFields);
+        rows.forEach((row, index) => { row.dataset.key = settings.fields[index].key; });
+        showThemeVariables(variables, settings.fields);
+        html.value = editedCode === savedCode ? combinedCode(settings) : syncThemeFields(editedCode, previousFields, settings.fields);
         showResult('항목을 저장했습니다.');
         paintPreview();
     });
@@ -531,7 +540,10 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
                 html.focus();
                 return;
             }
-            if (saveChanges({ html: html.value, css: '' })) showResult('HTML을 저장했습니다.');
+            if (saveChanges({ html: html.value, css: '' })) {
+                html.value = combinedCode(settings);
+                showResult('HTML을 저장했습니다.');
+            }
         },
         'reset-html': () => {
             html.value = DEFAULT_HTML;

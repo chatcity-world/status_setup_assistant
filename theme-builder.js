@@ -1,6 +1,154 @@
-import { DEFAULT_HTML } from './theme.js';
+import { indexFields } from './status.js';
+import { DEFAULT_HTML, gaugeDisplay, resolveThemeField, themeVariableNames } from './theme.js';
 
-export function validateTheme(code, fields) {
+const VARIABLE = /\{\{\s*([^{}]+?)\s*\}\}(\s*%)?/g;
+
+function gaugeVariables(bar, value) {
+    const gauge = document.createElement('template');
+    gauge.innerHTML = gaugeDisplay(bar, value);
+    return gauge.content;
+}
+
+function fieldRow(field) {
+    const row = document.createElement('div');
+    row.dataset.rpStatusField = field.key;
+    const label = document.createElement('span');
+    label.dataset.rpStatusFieldLabel = '';
+    label.textContent = field.label || field.key;
+    const [value, bar] = themeVariableNames(field).map(name => `{{${name}}}`);
+    row.append(label, ' ', bar ? gaugeVariables(bar, `${value}%`) : value);
+    return row;
+}
+
+function readThemeVariables(template, resolve) {
+    const nodes = [];
+    const formats = new Map();
+    let hasAllFields = false;
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.data.includes('{{') || node.parentElement?.closest('style, script')) continue;
+        nodes.push(node);
+        for (const [, token] of node.data.matchAll(VARIABLE)) {
+            if (token === '항목들') hasAllFields = true;
+            const match = resolve(token);
+            if (!match) continue;
+            if (!formats.has(match.field)) formats.set(match.field, new Set());
+            formats.get(match.field).add(match.format);
+        }
+    }
+    return { nodes, formats, hasAllFields };
+}
+
+function replaceVariables(nodes, resolve, formats, expandAll) {
+    let changed = false;
+    const rendered = new Map();
+    function replacementFor(original, token, percent = '') {
+        if (token === '항목들') return expandAll ?? original;
+        const match = resolve(token);
+        if (!match) return original;
+        const { field, format, wasGauge } = match;
+        const [value, bar] = themeVariableNames(field).map(name => `{{${name}}}`);
+        const fieldFormats = formats.get(field);
+        const hasValue = fieldFormats.has('value');
+        const hasBar = fieldFormats.has('gauge');
+        if (!bar) {
+            if (format === 'display' && hasValue) return '';
+            if (format === 'gauge' && (hasValue || fieldFormats.has('display'))) return '';
+            return value + (wasGauge ? '' : percent);
+        }
+        if (!rendered.has(field)) rendered.set(field, new Set());
+        const used = rendered.get(field);
+        if (used.has(format)) return '';
+        used.add(format);
+        if (format === 'display' && (hasValue || hasBar)) return '';
+        if (hasValue && hasBar) return format === 'gauge' ? bar : value + (percent || '%');
+        return gaugeVariables(bar, value + (percent || '%'));
+    }
+
+    for (const node of nodes) {
+        const content = document.createDocumentFragment();
+        let offset = 0;
+        for (const match of node.data.matchAll(VARIABLE)) {
+            const [original, token, percent] = match;
+            const replacement = replacementFor(original, token, percent);
+            if (replacement === original) continue;
+            content.append(node.data.slice(offset, match.index), replacement);
+            offset = match.index + original.length;
+        }
+        if (!offset) continue;
+        content.append(node.data.slice(offset));
+        node.replaceWith(content);
+        changed = true;
+    }
+    return changed;
+}
+
+function serializeTheme(template) {
+    const result = document.createElement('div');
+    result.append(template.content);
+    return result.innerHTML.trim();
+}
+
+export function syncThemeFields(code, previousFields, fields) {
+    if (!code || code === DEFAULT_HTML) return code;
+    const current = indexFields(fields);
+    const previous = indexFields(previousFields);
+    const oldFields = new Map(previousFields.map(field => [field.key, field]));
+    const targets = fields.filter(field => {
+        if (!field.enabled) return false;
+        const old = oldFields.get(field.key);
+        return field.type === 'gauge' || !old?.enabled || old.variable !== field.variable || old.label !== field.label || old.type !== field.type;
+    });
+    if (!targets.length && fields.length === previousFields.length) return code;
+    const targetKeys = new Set(targets.map(field => field.key));
+    const template = document.createElement('template');
+    template.innerHTML = code;
+    const resolve = token => {
+        const resolved = resolveThemeField(token, current) ?? resolveThemeField(token, previous, true);
+        const field = resolved && current.get(resolved.field.key);
+        if (!field || !targetKeys.has(field.key)) return undefined;
+        return { field, format: resolved.format, wasGauge: oldFields.get(field.key)?.type === 'gauge' };
+    };
+    let updated = false;
+    for (const row of template.content.querySelectorAll('[data-rp-status-field]')) {
+        const key = row.dataset.rpStatusField;
+        const field = current.get(key);
+        if (!field || field.key !== key) {
+            row.remove();
+            updated = true;
+            continue;
+        }
+        const label = row.querySelector('[data-rp-status-field-label]');
+        const previousLabel = oldFields.get(key)?.label;
+        if (label && label.textContent === previousLabel && label.textContent !== field.label) {
+            label.textContent = field.label;
+            updated = true;
+        }
+    }
+    for (const gauge of template.content.querySelectorAll('.rp-gauge-display')) {
+        const match = /^\{\{\s*([^{}]+?)\s*\}\}%?$/.exec(gauge.lastElementChild?.textContent.trim() ?? '');
+        const resolved = match && resolve(match[1]);
+        if (resolved?.field.type !== 'text' || !resolved.wasGauge) continue;
+        gauge.replaceWith(`{{${themeVariableNames(resolved.field)[0]}}}`);
+        updated = true;
+    }
+    const { nodes, formats, hasAllFields } = readThemeVariables(template, resolve);
+    updated = replaceVariables(nodes, resolve, formats) || updated;
+    if (!hasAllFields) {
+        const added = targets.filter(field => {
+            const old = oldFields.get(field.key);
+            return !formats.has(field) && (!old?.enabled || old.label !== field.label || old.type !== field.type);
+        });
+        const containers = [...template.content.children];
+        const container = containers.find(element => ['section', 'article', 'div'].includes(element.localName)) ?? template.content;
+        for (const field of added) container.append(fieldRow(field));
+        updated ||= added.length > 0;
+    }
+    return updated ? serializeTheme(template) : code;
+}
+
+export function validateTheme(code, fields, explicitVariables = false) {
     const text = String(code ?? '').trim()
         .replace(/^(?:\s*<(think|thinking|analysis)\b[^>]*>[\s\S]*?<\/\1\s*>)+\s*/i, '');
     const fenced = text.match(/(?:^|\r?\n)[ \t]*```(?:html)?[ \t]*\r?\n\s*(<[\s\S]*?)\r?\n[ \t]*```(?=[ \t]*(?:\r?\n|$))/i);
@@ -14,17 +162,17 @@ export function validateTheme(code, fields) {
     if (!template.content.firstElementChild || template.content.querySelector('script,style,iframe,link,object,embed,form,template')) {
         throw new Error('모델이 사용할 수 없는 HTML을 보냈어요. “인라인 스타일만 사용”을 덧붙여 다시 생성해 주세요.');
     }
-    const keys = new Set();
-    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
-    while (walker.nextNode()) {
-        for (const [, key] of walker.currentNode.data.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) keys.add(key);
-    }
-    const missing = fields.filter(field => field.enabled && !keys.has(field.key)
-        && !(field.type === 'gauge' && keys.has(field.key + '_게이지')));
-    if (missing.length && !keys.has('항목들')) {
+    const byKey = indexFields(fields);
+    const resolve = token => resolveThemeField(token, byKey);
+    const { nodes, formats, hasAllFields } = readThemeVariables(template, resolve);
+    const missing = fields.filter(field => field.enabled && !formats.has(field));
+    if (missing.length && !hasAllFields) {
         throw new Error('모델이 변수 일부를 빠뜨렸어요: ' + missing.map(field => field.label || field.key).join(', '));
     }
-    return clean;
+    if (!explicitVariables) return clean;
+    const expanded = hasAllFields ? document.createDocumentFragment() : null;
+    if (expanded) expanded.append(...missing.map(fieldRow));
+    return replaceVariables(nodes, resolve, formats, expanded) ? serializeTheme(template) : clean;
 }
 
 function describeRequestError(error) {
@@ -51,11 +199,13 @@ function describeRequestError(error) {
 export async function generateTheme(description, fields) {
     const context = SillyTavern.getContext();
     if (context.onlineStatus === 'no_connection') throw new Error('실리태번의 AI 연결을 먼저 설정해 주세요.');
-    const active = fields.filter(field => field.enabled).map(({key,label,type}) => ({key,label,type}));
+    const active = fields.filter(field => field.enabled).map(field => ({
+        label: field.label, type: field.type, variables: themeVariableNames(field).map(name => `{{${name}}}`),
+    }));
     const prompt = [
         'Create a compact roleplay status card that starts with its fields, with no generic heading. Return only one complete HTML fragment.',
         'Use inline style attributes for ALL styling. No style tags, scripts, external resources, event handlers, forms, document wrapper, fixed positioning or viewport units. Use responsive wrapping layouts that fit 280px. Make background match the requested theme using CSS colors, gradients and shadows. Ensure readable contrast.',
-        'Prefer one automatic fields placeholder: write 항목들 once between two opening braces and two closing braces, on its own line inside the card. It inserts all fields with their exact labels. Alternatively include every provided field with its exact label and its key between double braces. Put placeholders in text nodes only. For gauges, put % after the numeric placeholder and optionally use a second placeholder with _게이지 appended to the key. Do not invent values or other placeholders.',
+        'Use the exact variables listed for each field, once each and only in text nodes. A gauge field has two variables: render its _게이지 variable for the bar and its value variable followed by % for the number. Use the supplied display labels. Do not replace the variables with sample values, {{항목들}}, or a 표시: placeholder.',
         'Fields: '+JSON.stringify(active),
         'Theme request: '+description,
     ].join('\n');
@@ -73,7 +223,7 @@ export async function generateTheme(description, fields) {
         throw new Error(describeRequestError(error), { cause: error });
     }
     const parsed = typeof answer === 'string' ? context.parseReasoningFromString?.(answer) : undefined;
-    return validateTheme(parsed?.content ?? answer, fields);
+    return validateTheme(parsed?.content ?? answer, fields, true);
 }
 
 export function combinedCode(settings) {
