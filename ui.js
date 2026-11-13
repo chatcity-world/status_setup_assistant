@@ -23,7 +23,7 @@ const FIELD_OPTIONS = `
     <form data-fields>
         <p class="rp-status-hint">값의 형식이나 길이를 정하고 싶은 항목에만 AI 작성 규칙을 적으세요.</p>
         <div class="rp-status-fields" data-field-list></div>
-        <div class="rp-status-actions">
+        <div class="rp-status-actions rp-status-field-actions">
             <button class="menu_button" type="button" data-action="add-field">항목 추가</button>
             <button class="menu_button" type="submit">항목 저장</button>
         </div>
@@ -92,7 +92,7 @@ function addFieldRow(container, field = { label: '', type: 'text', enabled: true
     row.innerHTML = `
         <label>표시 이름<input class="text_pole" data-field="label" maxlength="48" required autocomplete="off"></label>
         <label>형식<select class="text_pole" data-field="type"><option value="text">텍스트</option><option value="gauge">게이지</option></select></label>
-        <label class="rp-status-field-rule">AI 작성 규칙 (선택)<input class="text_pole" data-field="rule" autocomplete="off"></label>
+        <label class="rp-status-field-rule">AI 작성 규칙 (선택)<input class="text_pole" data-field="rule" placeholder="AI에게 전달할 해당 변수에 대한 짧은 설명" autocomplete="off"></label>
         <label class="rp-status-field-enabled"><input type="checkbox" data-field="enabled"> 표시</label>
         <button class="menu_button" type="button">삭제</button>`;
     for (const input of row.querySelectorAll('[data-field]')) {
@@ -102,8 +102,6 @@ function addFieldRow(container, field = { label: '', type: 'text', enabled: true
     }
     const label = row.querySelector('[data-field="label"]');
     label.addEventListener('input', () => label.setCustomValidity(''));
-    const rule = row.querySelector('[data-field="rule"]');
-    rule.placeholder = field.key === '날짜' ? '예: YYYY년 MM월 DD일' : '예: 한 문장 이내';
     row.querySelector('button').addEventListener('click', () => row.remove());
     container.append(row);
     return label;
@@ -128,10 +126,8 @@ function showThemeVariables(list, fields) {
 }
 
 const SAMPLE_VALUES = {
-    날짜: '11월 13일', 시간: '오후 7:30', 날씨: '비', 기온: '12°C',
-    장소: '타로점', 옷차림: '검은 재킷', 포즈: '의자에 앉아 있음',
-    커뮤니티글: '시장에 새 가게가 열렸대요.', 속마음: '조금 더 같이 있고 싶다.',
-    애정: 65, 죄책감: 20, 욕구: 35,
+    날짜: '2026년 11월 13일', 시간: '19:30', 날씨: '비', 기온: '12°C',
+    장소: '타로점', 옷차림: '검은 재킷', 호감도: 65, 속마음: '조금 더 같이 있고 싶다.',
 };
 
 async function copyText(textarea) {
@@ -153,7 +149,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const root = document.createElement('details');
     root.className = 'rp-status-settings';
     root.innerHTML = `
-        <summary>RP 상태창</summary>
+        <summary>📊 헬프미상태창</summary>
         <div class="rp-status-settings-body">
             <label class="rp-status-switch">
                 <span>상태창 사용</span>

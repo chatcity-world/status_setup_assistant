@@ -173,7 +173,7 @@ globalThis.gamjaRpStatusPrepareGeneration = (coreChat, _maxTokens, _abort, type)
     const values = type === 'swipe' && isAssistant(previous)
         ? timeline(context.chat, settings.fields, -1, new Map([[previous, {}]])).values
         : getTimeline(context, settings).values;
-    const prompt = promptFor(values, settings.fields);
+    const prompt = promptFor(values, settings.fields, { character: context.name2, user: context.name1 });
     if (prompt) {
         // SillyTavern uses 1 for an in-chat prompt and 0 for the system role.
         context.setExtensionPrompt(STORE_KEY, prompt, 1, 0, false, 0, () => {

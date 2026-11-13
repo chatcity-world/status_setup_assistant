@@ -3,19 +3,15 @@ export const AI_KEY = 'gamja_rp_status_ai';
 const LEGACY_MANUAL_KEY = 'gamja_rp_status_manual';
 
 export const DEFAULT_FIELDS = [
-    { key: '날짜', label: '날짜', type: 'text', enabled: true },
-    { key: '시간', label: '시간', type: 'text', enabled: true },
-    { key: '날씨', label: '날씨', type: 'text', enabled: true },
-    { key: '기온', label: '기온', type: 'text', enabled: true },
-    { key: '장소', label: '장소', type: 'text', enabled: true },
-    { key: '옷차림', label: '옷차림', type: 'text', enabled: true },
-    { key: '포즈', label: '포즈', type: 'text', enabled: true },
-    { key: '커뮤니티글', label: '커뮤니티글', type: 'text', enabled: true },
-    { key: '속마음', label: '속마음', type: 'text', enabled: true },
-    { key: '애정', label: '애정', type: 'gauge', enabled: true },
-    { key: '죄책감', label: '죄책감', type: 'gauge', enabled: true },
-    { key: '욕구', label: '욕구', type: 'gauge', enabled: true },
-];
+    ['날짜', '현재 롤플레잉 날짜를 YYYY년 MM월 DD일로 표시'],
+    ['시간', '현재 롤플레잉 시간을 HH:MM으로 표시'],
+    ['날씨', '현재 롤플레잉의 날씨를 짧은 단어로 표시'],
+    ['기온', '현재 롤플레잉의 기온을 섭씨(°C)로 표기'],
+    ['장소', '현재 롤플레잉의 장소를 간단하게 표시'],
+    ['옷차림', '현재 {{char}}의 옷차림을 간단하게 표시'],
+    ['호감도', '현재 {{user}}에 대한 {{char}}의 호감도를 퍼센트(%)로 표시', 'gauge'],
+    ['속마음', '현재 {{char}}의 속마음을 1-2문장으로 표시'],
+].map(([key, rule, type = 'text']) => ({ key, label: key, type, enabled: true, rule }));
 
 function validKey(key) {
     return typeof key === 'string' && key.length <= 40
@@ -168,7 +164,7 @@ function promptJson(value) {
     return JSON.stringify(value).replaceAll('{{', '\\u007b\\u007b').replaceAll('}}', '\\u007d\\u007d');
 }
 
-export function promptFor(values, fields) {
+export function promptFor(values, fields, { character, user } = {}) {
     const active = fields.filter(field => field.enabled);
     if (!active.length) return '';
     const current = Object.fromEntries(active.filter(field => Object.hasOwn(values, field.key))
@@ -176,8 +172,9 @@ export function promptFor(values, fields) {
     const keys = active.map(field => `${field.key}${field.type === 'gauge' ? ' (integer 0–100)' : ''}`).join(', ');
     const labels = active.filter(field => field.label && field.label !== field.key)
         .map(field => [field.key, field.label]);
-    const rules = active.map(field => [field.key, typeof field.rule === 'string' ? field.rule.trim() : ''])
-        .filter(([, rule]) => rule);
+    const names = { char: character || '답변하는 캐릭터', user: user || '사용자' };
+    const rules = active.filter(field => typeof field.rule === 'string' && field.rule.trim())
+        .map(({ key, rule }) => [key, rule.trim().replace(/\{\{\s*(char|user)\s*\}\}/gi, (_, name) => names[name.toLowerCase()])]);
     return [
         `Current roleplay scene state (JSON data): ${promptJson(current)}`,
         `Allowed state keys: ${keys}.`,
