@@ -15,10 +15,12 @@ export const THEME_PRESETS = {
 };
 
 export const THEME_GROUPS = ['1', '2', '3'];
+const COMPACT_GROUPS = ['1', '2'];
 const ALIGNMENTS = ['left', 'center', 'right'];
 const TOP_FIELDS = new Set(['날짜', '시간', '날씨', '기온']);
 const DEFAULT_ORDER = ['날짜', '시간', '날씨', '기온', '장소', '옷차림'];
 const HEX_COLOR = /^#[\da-f]{6}$/i;
+const GROUP_ID = /^[1-9]\d*$/;
 
 function defaultItems(fields) {
     const byKey = indexFields(fields);
@@ -53,12 +55,15 @@ function colorSettings(saved) {
 export function normalizeThemeLayout(fields, saved) {
     const byKey = indexFields(fields);
     const available = new Map(defaultItems(fields).map(field => [field.key, field]));
+    const groups = new Set([...THEME_GROUPS, ...Object.keys(saved?.groups ?? {}).filter(id => GROUP_ID.test(id))]);
     const items = [];
     const savedByKey = new Map((Array.isArray(saved?.items) ? saved.items : []).filter(item => item?.key).map(item => [item.key, item]));
     function add(field, existing) {
-        const group = THEME_GROUPS.includes(existing?.group) || existing?.group === '' ? existing.group : defaultGroup(field, byKey);
+        const group = typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
+            ? existing.group : defaultGroup(field, byKey);
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
         const label = typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
+        if (group) groups.add(group);
         items.push({ key: field.key, group, align, label, ...colorSettings(existing) });
         available.delete(field.key);
     }
@@ -71,11 +76,19 @@ export function normalizeThemeLayout(fields, saved) {
         add(field);
         if (index >= 0) items.splice(index + 1, 0, items.pop());
     }
+    const orderedGroups = [...groups].sort((left, right) => left.length - right.length || left.localeCompare(right));
     return {
         items,
-        groups: Object.fromEntries(THEME_GROUPS.map(id => [id, colorSettings(saved?.groups?.[id])])),
+        groups: Object.fromEntries(orderedGroups.map(id => [id, colorSettings(saved?.groups?.[id])])),
         ...(HEX_COLOR.test(saved?.background) && { background: saved.background }),
     };
+}
+
+export function addThemeGroup(layout) {
+    const last = Object.keys(layout.groups).at(-1);
+    const id = String(BigInt(last) + 1n);
+    layout.groups[id] = {};
+    return id;
 }
 
 export function layoutBlocks(items) {
@@ -125,7 +138,7 @@ export function itemThemeColors(palette, field, item) {
 
 export function groupThemeColors(palette, layout, id) {
     return {
-        background: layout.groups[id]?.background ?? (id === '3' ? palette.scene : 'transparent'),
+        background: layout.groups[id]?.background ?? (COMPACT_GROUPS.includes(id) ? 'transparent' : palette.scene),
         text: layout.groups[id]?.text ?? palette.text,
     };
 }
@@ -187,7 +200,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
             blocks.push({ html: renderPresetField(palette, byKey.get(item.key), item) });
             continue;
         }
-        const compact = item.group !== '3';
+        const compact = COMPACT_GROUPS.includes(item.group);
         const distributes = compact && members.some(member => member.align !== 'left' || byKey.get(member.key).type === 'gauge');
         const colors = groupThemeColors(palette, layout, item.group);
         const grid = compact ? 'display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 8px' : 'display:grid;grid-template-columns:minmax(0,1fr);gap:5px';

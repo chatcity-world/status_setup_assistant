@@ -1,7 +1,7 @@
 import { generateTheme, combinedCode, setThemeBackground, syncThemeFields, themeBackground } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
 import { DEFAULT_HTML, themeVariableNames } from './theme.js';
-import { getLegacyThemePreset, getThemePreset, makeThemePreset, moveThemeItem, normalizeThemeLayout, THEME_PRESETS, useCustomThemeCode } from './theme-presets.js';
+import { addThemeGroup, getLegacyThemePreset, getThemePreset, makeThemePreset, moveThemeItem, normalizeThemeLayout, THEME_PRESETS, useCustomThemeCode } from './theme-presets.js';
 import { mountThemeLayout } from './theme-layout-ui.js';
 import { createFieldKey, indexFields } from './status.js';
 
@@ -381,14 +381,14 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             return;
         }
         const layout = draftLayouts[draftPreset];
-        const index = layout.items.findIndex(item => item.key === key);
+        const item = layout.items.find(item => item.key === key);
         if (direction) {
             const visibleKeys = new Set(settings.fields.filter(field => field.enabled).map(field => field.key));
             layout.items = moveThemeItem(layout.items, key, direction, visibleKeys);
         } else if (group) {
             layout.groups[group][property] = value;
-        } else if (index >= 0) {
-            layout.items[index][property] = value;
+        } else if (item) {
+            item[property] = property === 'group' && value === 'new' ? addThemeGroup(layout) : value;
         } else if (!key && property === 'background') {
             layout.background = value;
         }

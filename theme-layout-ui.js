@@ -1,5 +1,5 @@
 import { escapeHtml, themeVariableNames } from './theme.js';
-import { groupThemeColors, itemThemeColors, layoutBlocks, THEME_GROUPS, THEME_PRESETS } from './theme-presets.js';
+import { groupThemeColors, itemThemeColors, layoutBlocks, THEME_PRESETS } from './theme-presets.js';
 
 const ALIGN_OPTIONS = [['left', '왼쪽 정렬'], ['center', '가운데 정렬'], ['right', '오른쪽 정렬']];
 
@@ -28,7 +28,6 @@ export function mountThemeLayout(container, update) {
     const surface = container.querySelector('[data-layout-surface]');
     const surfaceColor = surface.querySelector('input');
     const surfaceChip = surfaceColor.parentElement;
-    const groupOptions = [['', '단독'], ...THEME_GROUPS.map(id => [id, `그룹 ${id}`])];
 
     function restoreFocus(key, group, selector) {
         const rows = [...container.querySelectorAll('[data-layout-item], [data-layout-group-style]')];
@@ -76,6 +75,7 @@ export function mountThemeLayout(container, update) {
         surfaceChip.classList.toggle('rp-status-color-transparent', !background);
         surfaceChip.style.setProperty('--rp-swatch', background ?? 'transparent');
         if (!preset) return;
+        const groupOptions = [['', '단독'], ...Object.keys(layout.groups).map(id => [id, `그룹 ${id}`])];
         const byKey = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
         const blocks = layoutBlocks(layout.items.filter(item => byKey.has(item.key)));
         const first = blocks[0]?.[0];
@@ -84,7 +84,8 @@ export function mountThemeLayout(container, update) {
             const field = byKey.get(item.key);
             const name = escapeHtml(field.label || field.key);
             const variable = escapeHtml(themeVariableNames(field)[0]);
-            return `<div class="rp-status-layout-row" role="group" aria-label="${name}" data-layout-item="${escapeHtml(item.key)}">
+            const identity = item.group ? ` role="group" aria-label="${name}" data-layout-item="${escapeHtml(item.key)}"` : '';
+            return `<div class="rp-status-layout-row"${identity}>
                 <div class="rp-status-layout-heading">
                     <code>{{${variable}}}</code>
                     <div class="rp-status-layout-order">
@@ -99,24 +100,28 @@ export function mountThemeLayout(container, update) {
                     </label>
                     <select class="text_pole" data-layout-property="group" aria-label="${name} 그룹">
                         ${groupOptions.map(([id, label]) => `<option value="${id}" ${item.group === id ? 'selected' : ''}>${label}</option>`).join('')}
+                        <option value="new">+ 새 그룹</option>
                     </select>
                     <select class="text_pole" data-layout-property="align" aria-label="${name} 텍스트 정렬">
                         ${ALIGN_OPTIONS.map(([id, label]) => `<option value="${id}" ${item.align === id ? 'selected' : ''}>${label}</option>`).join('')}
                     </select>
                 </div>
-                ${item.group ? '' : colorControls(itemThemeColors(palette, field, item), background)}
             </div>`;
         }
         list.innerHTML = blocks.map(members => {
-            const group = members[0].group;
-            const rows = members.map(renderItem).join('');
-            if (!group) return rows;
-            return `<div class="rp-status-layout-group" data-layout-group-style="${group}" role="group" aria-label="그룹 ${group}">
-                <div class="rp-status-layout-group-heading">
-                    <strong>그룹 ${group}</strong>
-                    ${colorControls(groupThemeColors(palette, layout, group), background)}
+            const [item] = members;
+            const { group, key } = item;
+            const field = byKey.get(key);
+            const title = group ? `그룹 ${group}` : '단독';
+            const name = group ? title : `${escapeHtml(field.label || key)} 단독`;
+            const identity = group ? `data-layout-group-style="${group}"` : `data-layout-item="${escapeHtml(key)}"`;
+            const colors = group ? groupThemeColors(palette, layout, group) : itemThemeColors(palette, field, item);
+            return `<div class="rp-status-layout-card" ${identity} role="group" aria-label="${name}">
+                <div class="rp-status-layout-card-heading">
+                    <strong>${title}</strong>
+                    ${colorControls(colors, background)}
                 </div>
-                ${rows}
+                ${members.map(renderItem).join('')}
             </div>`;
         }).join('');
     };
