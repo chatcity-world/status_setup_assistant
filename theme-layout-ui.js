@@ -1,8 +1,6 @@
 import { escapeHtml, themeVariableNames } from './theme.js';
 import { groupThemeColors, itemThemeColors, layoutBlocks, THEME_PRESETS } from './theme-presets.js';
 
-const ALIGN_OPTIONS = [['left', '왼쪽 정렬'], ['center', '가운데 정렬'], ['right', '오른쪽 정렬']];
-
 function colorInput(property, label, color, { fallback = color, ariaLabel = label + ' 색상' } = {}) {
     const transparent = color === 'transparent';
     return `<label class="rp-status-layout-color">
@@ -100,14 +98,11 @@ export function mountThemeLayout(container, update) {
                         <input type="checkbox" role="switch" data-layout-property="label" ${item.label ? 'checked' : ''}>
                         <span class="rp-status-layout-track" aria-hidden="true"></span> 라벨
                     </label>
+                    ${gaugeColor}
                     <select class="text_pole" data-layout-property="group" aria-label="${name} 그룹">
                         ${groupOptions.map(([id, label]) => `<option value="${id}" ${item.group === id ? 'selected' : ''}>${label}</option>`).join('')}
                         <option value="new">+ 새 그룹</option>
                     </select>
-                    <select class="text_pole" data-layout-property="align" aria-label="${name} 텍스트 정렬">
-                        ${ALIGN_OPTIONS.map(([id, label]) => `<option value="${id}" ${item.align === id ? 'selected' : ''}>${label}</option>`).join('')}
-                    </select>
-                    ${gaugeColor}
                 </div>
             </div>`;
         }

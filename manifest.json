@@ -1,7 +1,7 @@
 {
   "display_name": "📊 헬프미상태창",
   "author": "Gamja",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "minimum_client_version": "1.19.0",
   "loading_order": 35,
   "js": "index.js",

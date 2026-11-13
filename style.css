@@ -529,7 +529,14 @@
 .rp-status-layout-heading { justify-content: space-between; }
 .rp-status-layout-heading code { min-width: 0; overflow-wrap: anywhere; }
 .rp-status-layout-order { flex-wrap: nowrap; gap: 4px; }
-.rp-status-layout-controls .text_pole { flex: 1 1 86px; width: auto; }
+.rp-status-settings .rp-status-layout-controls select[data-layout-property="group"] {
+    flex: 0 1 auto;
+    width: auto;
+    min-height: 32px;
+    margin-inline-start: auto;
+    font-size: 12px;
+}
+
 .rp-status-layout-color { flex-wrap: nowrap; }
 .rp-status-layout-label { position: relative; flex-wrap: nowrap; min-height: 28px; cursor: pointer; }
 .rp-status-layout-surface { width: fit-content; margin-top: 6px; }
@@ -589,6 +596,7 @@
 
 .rp-status-layout-order button { min-width: 30px; }
 .rp-status-layout-order button:disabled { opacity: .4; cursor: default; }
+.rp-status-layout-clear { padding: 2px 6px; font-size: 12px; white-space: nowrap; }
 .rp-status-layout-clear[aria-pressed="true"] { background: var(--rp-ui-soft); }
 
 .rp-status-color-chip {
@@ -738,8 +746,6 @@
     .rp-status-settings .rp-status-theme-choice,
     .rp-status-settings .rp-status-code-editor .menu_button,
     .rp-status-layout-order button,
-    .rp-status-layout-clear,
-    .rp-status-layout-controls .text_pole,
     .rp-status-layout-label,
     .rp-status-layout-color { min-height: 44px; }
     .rp-status-layout-order button { min-width: 44px; }
