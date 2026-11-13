@@ -53,7 +53,7 @@ const HTML_OPTIONS = `
     </fieldset>
     <fieldset class="rp-status-layout" data-theme-layout>
         <legend>배치·색상</legend>
-        <p class="rp-status-hint" data-layout-hint hidden>화이트 또는 다크를 선택하면 항목의 배치를 편집할 수 있어요.</p>
+        <p class="rp-status-hint" data-layout-hint hidden>기본 테마를 선택하면 항목의 배치를 편집할 수 있어요.</p>
         <label class="rp-status-layout-surface rp-status-layout-color" data-layout-surface hidden>
             <span>전체 배경</span>
             <span class="rp-status-color-chip"><input type="color" aria-label="상태창 전체 배경색"></span>
@@ -195,7 +195,7 @@ function showThemeVariables(list, fields) {
 }
 
 const SAMPLE_VALUES = {
-    날짜: '2026년 11월 13일', 시간: '19:30', 날씨: '비', 기온: '12°C',
+    날짜: '2026년 11월 13일', 시간: '19:30', 날씨: '☀️ 맑음', 기온: '12°C',
     장소: '타로점', 옷차림: '검은 재킷', 호감도: 65, 속마음: '조금 더 같이 있고 싶다.',
 };
 

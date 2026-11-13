@@ -16,6 +16,8 @@ const defaults = {
 
 const previousDefaultKeys = ['날짜', '시간', '날씨', '기온', '장소', '옷차림', '포즈', '커뮤니티글', '속마음', '애정', '죄책감', '욕구'];
 const previousGauges = new Set(['애정', '죄책감', '욕구']);
+const previousWeatherRule = '현재 롤플레잉의 날씨를 짧은 단어로 표시';
+const defaultWeatherRule = DEFAULT_FIELDS.find(field => field.key === '날씨').rule;
 
 function usesPreviousDefaults(settings) {
     return settings.html === DEFAULT_HTML && !settings.css && Array.isArray(settings.fields)
@@ -34,6 +36,8 @@ function copySettings(saved) {
     if (usesPreviousDefaults(settings)) {
         settings.fields = DEFAULT_FIELDS.map(field => ({ ...field, key: field.key === '호감도' ? '애정' : field.key }));
     }
+    const weather = settings.fields.find(field => field.key === '날씨' && field.rule === previousWeatherRule);
+    if (weather) weather.rule = defaultWeatherRule;
     const fields = assignThemeVariables(settings.fields);
     const preset = getThemePreset(settings.html);
     if (preset && settings.themeLayouts[preset]) {

@@ -530,6 +530,7 @@
 .rp-status-layout-heading code { min-width: 0; overflow-wrap: anywhere; }
 .rp-status-layout-order { flex-wrap: nowrap; gap: 4px; }
 .rp-status-layout-controls .text_pole { flex: 1 1 86px; width: auto; }
+.rp-status-layout-color { flex-wrap: nowrap; }
 .rp-status-layout-label { position: relative; flex-wrap: nowrap; min-height: 28px; cursor: pointer; }
 .rp-status-layout-surface { width: fit-content; margin-top: 6px; }
 

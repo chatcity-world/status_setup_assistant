@@ -3,22 +3,21 @@ import { groupThemeColors, itemThemeColors, layoutBlocks, THEME_PRESETS } from '
 
 const ALIGN_OPTIONS = [['left', '왼쪽 정렬'], ['center', '가운데 정렬'], ['right', '오른쪽 정렬']];
 
+function colorInput(property, label, color, { fallback = color, ariaLabel = label + ' 색상' } = {}) {
+    const transparent = color === 'transparent';
+    return `<label class="rp-status-layout-color">
+        <span>${label}</span>
+        <span class="rp-status-color-chip${transparent ? ' rp-status-color-transparent' : ''}" style="--rp-swatch:${color}">
+            <input type="color" data-layout-color="${property}" value="${transparent ? fallback : color}" aria-label="${ariaLabel}">
+        </span>
+    </label>`;
+}
+
 function colorControls(colors, defaultBackground) {
-    const transparent = colors.background === 'transparent';
     return `<div class="rp-status-layout-colors">
-        <label class="rp-status-layout-color">
-            <span>배경</span>
-            <span class="rp-status-color-chip${transparent ? ' rp-status-color-transparent' : ''}" style="--rp-swatch:${transparent ? 'transparent' : colors.background}">
-                <input type="color" data-layout-color="background" value="${transparent ? defaultBackground : colors.background}" aria-label="배경 색상">
-            </span>
-        </label>
-        <button class="rp-status-layout-clear" type="button" data-layout-clear aria-pressed="${transparent}">배경 없음</button>
-        <label class="rp-status-layout-color">
-            <span>글자</span>
-            <span class="rp-status-color-chip" style="--rp-swatch:${colors.text}">
-                <input type="color" data-layout-color="text" value="${colors.text}" aria-label="글자 색상">
-            </span>
-        </label>
+        ${colorInput('background', '배경', colors.background, { fallback: defaultBackground })}
+        <button class="rp-status-layout-clear" type="button" data-layout-clear aria-pressed="${colors.background === 'transparent'}">배경 없음</button>
+        ${colorInput('text', '글자', colors.text)}
     </div>`;
 }
 
@@ -85,6 +84,9 @@ export function mountThemeLayout(container, update) {
             const name = escapeHtml(field.label || field.key);
             const variable = escapeHtml(themeVariableNames(field)[0]);
             const identity = item.group ? ` role="group" aria-label="${name}" data-layout-item="${escapeHtml(item.key)}"` : '';
+            const gaugeColor = field.type === 'gauge'
+                ? colorInput('gaugeColor', '게이지 색', itemThemeColors(palette, field, item).gaugeColor, { ariaLabel: name + ' 게이지 색상' })
+                : '';
             return `<div class="rp-status-layout-row"${identity}>
                 <div class="rp-status-layout-heading">
                     <code>{{${variable}}}</code>
@@ -105,6 +107,7 @@ export function mountThemeLayout(container, update) {
                     <select class="text_pole" data-layout-property="align" aria-label="${name} 텍스트 정렬">
                         ${ALIGN_OPTIONS.map(([id, label]) => `<option value="${id}" ${item.align === id ? 'selected' : ''}>${label}</option>`).join('')}
                     </select>
+                    ${gaugeColor}
                 </div>
             </div>`;
         }

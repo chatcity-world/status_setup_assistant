@@ -103,10 +103,10 @@ function gauge(label, value, compact = false) {
     return `<progress class="rp-gauge" style="${layout};min-width:0;height:6px;accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
 }
 
-export function gaugeDisplay(bar, percent) {
+export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '') {
     return `<span class="rp-gauge-display" style="display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px">
-        <span style="display:flex;align-items:center;min-width:0;height:6px;overflow:hidden;border-radius:999px;background:var(--rp-gauge-track,transparent)">${bar}</span>
-        <span style="font-variant-numeric:tabular-nums;white-space:nowrap">${percent}</span>
+        <span style="display:flex;align-items:center;min-width:0;height:6px;overflow:hidden;border-radius:999px;background:var(--rp-gauge-track,transparent);${trackStyle}">${bar}</span>
+        <span style="font-variant-numeric:tabular-nums;white-space:nowrap;${valueStyle}">${percent}</span>
     </span>`;
 }
 

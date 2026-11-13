@@ -1,18 +1,8 @@
 import { indexFields } from './status.js';
 import { escapeHtml, gaugeDisplay, themeVariableNames } from './theme.js';
+import { slackRail, THEME_PRESETS } from './theme-preset-styles.js';
 
-export const THEME_PRESETS = {
-    white: {
-        label: '화이트', scheme: 'light', swatch: '#fff',
-        background: '#f8f8f8', text: '#28292c', muted: '#656970', scene: '#ffffff', thought: '#f2f2f2',
-        gaugeText: '#384451', gaugeAccent: '#657589', gaugeTrack: '#e5e7e9',
-    },
-    dark: {
-        label: '다크', scheme: 'dark', swatch: '#24262b',
-        background: '#202227', text: '#eef0f3', muted: '#b0b7c2', scene: '#2b2e34', thought: '#292c33',
-        gaugeText: '#d5e0ed', gaugeAccent: '#9db3cd', gaugeTrack: '#3c444f',
-    },
-};
+export { THEME_PRESETS };
 
 export const THEME_GROUPS = ['1', '2', '3'];
 const COMPACT_GROUPS = ['1', '2'];
@@ -63,8 +53,13 @@ export function normalizeThemeLayout(fields, saved) {
             ? existing.group : defaultGroup(field, byKey);
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
         const label = typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
+        const gaugeColor = existing?.gaugeColor;
         if (group) groups.add(group);
-        items.push({ key: field.key, group, align, label, ...colorSettings(existing) });
+        items.push({
+            key: field.key, group, align, label,
+            ...colorSettings(existing),
+            ...(typeof gaugeColor === 'string' && HEX_COLOR.test(gaugeColor) && { gaugeColor }),
+        });
         available.delete(field.key);
     }
     for (const key of savedByKey.keys()) {
@@ -131,28 +126,37 @@ export function moveThemeItem(items, key, direction, visibleKeys) {
 
 export function itemThemeColors(palette, field, item) {
     return {
-        background: item.background ?? (field.key === '속마음' ? palette.thought : 'transparent'),
+        background: item.background ?? (field.key === '속마음' ? palette.thought
+            : field.type === 'gauge' ? palette.gaugeBackground ?? 'transparent' : 'transparent'),
         text: item.text ?? (field.type === 'gauge' ? palette.gaugeText : palette.text),
+        gaugeColor: item.gaugeColor ?? palette.gaugeAccent,
     };
 }
 
 export function groupThemeColors(palette, layout, id) {
+    const compact = COMPACT_GROUPS.includes(id);
+    const slackWeather = palette.slack && id === '2';
+    const background = compact ? (slackWeather ? 'transparent' : palette.headerBackground ?? 'transparent') : palette.scene;
+    const text = compact ? (slackWeather ? palette.muted : palette.headerText ?? palette.text) : palette.text;
     return {
-        background: layout.groups[id]?.background ?? (COMPACT_GROUPS.includes(id) ? 'transparent' : palette.scene),
-        text: layout.groups[id]?.text ?? palette.text,
+        background: layout.groups[id]?.background ?? background,
+        text: layout.groups[id]?.text ?? text,
     };
 }
 
 export function getThemePreset(code) {
     const root = /^\s*<section\b[^>]*>/i.exec(code ?? '')?.[0] ?? '';
     if (/\sdata-rp-status-custom\b/.test(root)) return undefined;
-    return /\bdata-rp-status-preset="(white|dark)"/.exec(root)?.[1];
+    const id = /\sdata-rp-status-preset="([a-z-]+)"/.exec(root)?.[1];
+    return Object.hasOwn(THEME_PRESETS, id) ? id : undefined;
 }
 
 export function getLegacyThemePreset(code) {
     const root = /^\s*<section\b[^>]*>/i.exec(code ?? '')?.[0] ?? '';
     if (root.includes('data-rp-status-') || !root.includes('aria-label="상태 정보"') || !root.includes('font:12px/1.55 system-ui')) return undefined;
-    return Object.keys(THEME_PRESETS).find(key => {
+    // Earlier white presets were saved without a preset identifier.
+    if (root.includes('background:#f8f8f8;color:#28292c;color-scheme:light')) return 'white';
+    return ['white', 'dark'].find(key => {
         const palette = THEME_PRESETS[key];
         return root.includes(`background:${palette.background};color:${palette.text};color-scheme:${palette.scheme}`);
     });
@@ -162,65 +166,117 @@ export function useCustomThemeCode(code) {
     return code.replace(/^(\s*<section\b)(?![^>]*\sdata-rp-status-custom\b)/i, '$1 data-rp-status-custom');
 }
 
-function renderPresetField(palette, field, item, groupColors, compact = false, distributes = false) {
-    const customText = item.group ? groupColors.text !== palette.text : Boolean(item.text);
-    const { background, text } = groupColors ?? itemThemeColors(palette, field, item);
+function renderPresetField(palette, field, item, { groupColors, compact = false, distributes = false, channel = false } = {}) {
+    const skin = palette.skin ?? {};
+    const customText = item.group ? groupColors.customText : Boolean(item.text);
+    const itemColors = itemThemeColors(palette, field, item);
+    const { background, text } = groupColors ?? itemColors;
     const [valueName, barName] = themeVariableNames(field).map(escapeHtml);
     let value = `{{${valueName}}}`;
     if (barName) {
-        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`);
+        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.numbers);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
     const centeredLabel = item.align !== 'left' || field.key === '속마음';
     const inlineLabel = compact || !centeredLabel;
-    const labelColumn = compact ? 'max-content' : 'minmax(40px,max-content)';
-    const rowLayout = item.label && inlineLabel ? `display:grid;grid-template-columns:${labelColumn} minmax(0,1fr);align-items:baseline;gap:8px;` : '';
-    const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${background === 'transparent' ? '1px 12px' : '11px 12px'};`;
+    const cell = skin.cellLine && groupColors && !compact;
+    const labelColumn = compact ? 'max-content' : skin.labelColumn ?? 'minmax(40px,max-content)';
+    const rowLayout = item.label && inlineLabel ? `display:grid;grid-template-columns:${labelColumn} minmax(0,1fr);align-items:baseline;gap:${cell ? 0 : 8}px;` : '';
+    const roleStyle = field.key === '속마음' ? skin.thought : barName ? skin.gauge : '';
+    const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${background === 'transparent' ? '1px 12px' : '11px 12px'};${skin.item ?? ''}${roleStyle ?? ''}`;
     const font = compact && !item.label && ['날짜', '날씨'].includes(field.key) ? 'font-weight:650;' : '';
-    const color = customText ? 'inherit' : palette.muted;
-    const label = item.label ? `<dt data-rp-status-field-label style="font-size:10px;font-weight:600;color:${color}">${escapeHtml(field.label || field.key)}</dt>` : '';
-    const gauge = barName ? `--rp-gauge-accent:${palette.gaugeAccent};--rp-gauge-track:${palette.gaugeTrack};` : '';
+    const labelTone = compact ? palette.headerMuted ?? palette.muted : palette.muted;
+    const color = customText || channel ? 'inherit' : labelTone;
+    const labelName = escapeHtml(field.label || field.key);
+    const labelStyle = `font-size:10px;font-weight:600;${skin.label ?? ''}color:${color};${cell ? 'padding:6px 9px;' : ''}`;
+    const label = !item.label ? '' : channel
+        ? `<dt style="${labelStyle}"><span aria-hidden="true"># </span><span data-rp-status-field-label>${labelName}</span></dt>`
+        : `<dt data-rp-status-field-label style="${labelStyle}">${labelName}</dt>`;
+    const gauge = barName ? `--rp-gauge-accent:${itemColors.gaugeColor};--rp-gauge-track:${palette.gaugeTrack};` : '';
     const width = !item.group && field.key === '속마음' ? 'max-width:60ch;' : '';
     const margin = !inlineLabel ? (item.label ? '4px auto 0' : '0 auto') : '0';
-    const muted = compact && !customText && ['시간', '기온'].includes(field.key) ? `color:${palette.muted};` : '';
+    const numeric = compact && ['시간', '기온'].includes(field.key);
+    const muted = numeric && !customText ? `color:${palette.headerMuted ?? palette.muted};` : '';
     const flex = distributes || (compact && barName) ? 'flex:1 1 6rem;' : '';
-    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${font}${flex}margin:0;min-width:0;text-align:${item.align}">
+    const channelStyle = channel ? 'flex:1 1 148px;' : '';
+    const cellStyle = cell ? `background:${background};` : '';
+    const cellValue = cell ? `padding:6px 9px;${item.label && inlineLabel ? `border-inline-start:1px solid ${skin.cellLine};` : ''}` : '';
+    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${font}${flex}${channelStyle}margin:0;min-width:0;text-align:${item.align}">
       ${label}
-      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${gauge}${muted}">${value}</dd>
+      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${muted}${numeric ? skin.numbers ?? '' : ''}">${value}</dd>
     </dl>`;
+}
+
+function renderGroup(palette, members, byKey, layout) {
+    const id = members[0].group;
+    const compact = COMPACT_GROUPS.includes(id);
+    const skin = palette.skin ?? {};
+    const distributes = compact && members.some(member => member.align !== 'left' || byKey.get(member.key).type === 'gauge');
+    const colors = groupThemeColors(palette, layout, id);
+    colors.customText = Boolean(layout.groups[id]?.text);
+    const grid = compact ? 'display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 8px' : 'display:grid;grid-template-columns:minmax(0,1fr);gap:5px';
+    const pad = colors.background === 'transparent' ? '1px 12px' : '10px 12px';
+    const markup = members.map(member => renderPresetField(palette, byKey.get(member.key), member, {
+        groupColors: colors, compact, distributes,
+    })).join('\n    ');
+    const flex = distributes ? 'flex:1 1 min(100%,14rem);' : '';
+    const align = compact && id === '2' && skin.header ? 'justify-content:flex-end;' : '';
+    const surface = compact || colors.background === 'transparent' ? colors.background
+        : skin.cellLine ?? layout.groups[id]?.background ?? palette.sceneBackground ?? colors.background;
+    return `<div data-rp-status-group style="${grid};${flex}min-width:0;padding:${pad};border-radius:12px;background:${surface};color:${colors.text};${compact ? skin.headerGroup ?? '' : skin.scene ?? ''}${align}">
+    ${markup}
+  </div>`;
+}
+
+function renderSlack(palette, blocks, byKey, layout) {
+    const { header, divider } = palette.slack;
+    const [dates, weather, scene, ...remaining] = blocks;
+    const [channel, ...sceneItems] = scene.members;
+    const colors = groupThemeColors(palette, layout, scene.group);
+    colors.customText = Boolean(layout.groups[scene.group]?.text);
+    const title = renderPresetField(palette, byKey.get(channel.key), channel, {
+        groupColors: colors, compact: true, channel: true,
+    });
+    const head = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:8px 11px;background:${layout.groups[scene.group]?.background ?? header};color:${colors.text};border-bottom:1px solid ${divider}">
+    ${title}
+    <div data-rp-status-group style="margin-inline-start:auto">${weather.html}</div>
+  </div>`;
+    const dateLine = `<div data-rp-status-group style="display:flex;justify-content:center;background:linear-gradient(${divider},${divider}) center/100% 1px no-repeat">${dates.html}</div>`;
+    const sceneHtml = sceneItems.length ? renderGroup(palette, sceneItems, byKey, layout) : '';
+    const body = [dateLine, sceneHtml, ...remaining.map(block => block.html)].filter(Boolean).join('\n    ');
+    return `${slackRail(palette.slack)}
+  <div style="min-width:0">
+    ${head}
+    <div data-rp-status-group style="display:grid;gap:7px;padding:8px 11px 10px">
+      ${body}
+    </div>
+  </div>`;
 }
 
 export function makeThemePreset(palette, fields, savedLayout) {
     const layout = normalizeThemeLayout(fields, savedLayout);
     const byKey = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
-    const blocks = [];
-    for (const members of layoutBlocks(layout.items.filter(item => byKey.has(item.key)))) {
+    const blocks = layoutBlocks(layout.items.filter(item => byKey.has(item.key))).map(members => {
         const [item] = members;
-        if (!item.group) {
-            blocks.push({ html: renderPresetField(palette, byKey.get(item.key), item) });
-            continue;
-        }
-        const compact = COMPACT_GROUPS.includes(item.group);
-        const distributes = compact && members.some(member => member.align !== 'left' || byKey.get(member.key).type === 'gauge');
-        const colors = groupThemeColors(palette, layout, item.group);
-        const grid = compact ? 'display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 8px' : 'display:grid;grid-template-columns:minmax(0,1fr);gap:5px';
-        const pad = colors.background === 'transparent' ? '1px 12px' : '10px 12px';
-        const markup = members.map(member => renderPresetField(palette, byKey.get(member.key), member, colors, compact, distributes)).join('\n    ');
-        const flex = distributes ? 'flex:1 1 min(100%,14rem);' : '';
-        blocks.push({ group: item.group, html: `<div data-rp-status-group style="${grid};${flex}min-width:0;padding:${pad};border-radius:12px;background:${colors.background};color:${colors.text}">
-    ${markup}
-  </div>` });
-    }
+        const html = item.group ? renderGroup(palette, members, byKey, layout) : renderPresetField(palette, byKey.get(item.key), item);
+        return { group: item.group, members, html };
+    });
+    const skin = palette.skin ?? {};
     const firstGroups = blocks[0]?.group === '1' && blocks[1]?.group === '2';
-    if (firstGroups) {
-        const header = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 16px;font-variant-numeric:tabular-nums">
+    const slackHeader = palette.slack && firstGroups && blocks[2]?.group === '3' && blocks[2].members[0].key === '장소';
+    if (firstGroups && !slackHeader) {
+        const header = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 16px;font-variant-numeric:tabular-nums;${skin.header ?? ''}">
     ${blocks[0].html}
     ${blocks[1].html}
   </div>`;
         blocks.splice(0, 2, { html: header });
     }
-    const preset = palette.scheme === 'dark' ? 'dark' : 'white';
-    return `<section lang="ko" aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font:12px/1.55 system-ui,sans-serif;overflow-wrap:anywhere">
-  ${blocks.map(block => block.html).join('\n  ')}
+    const body = blocks.map(block => block.html).join('\n  ');
+    const content = slackHeader ? renderSlack(palette, blocks, byKey, layout)
+        : palette.slack ? `${slackRail(palette.slack)}<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;padding:8px 11px 10px">${body}</div>`
+            : [body, skin.footer].filter(Boolean).join('\n  ');
+    const preset = palette.id ?? (palette.scheme === 'dark' ? 'dark' : 'white');
+    return `<section lang="ko" aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.cardBackground ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font:12px/1.55 system-ui,sans-serif;overflow-wrap:anywhere;${skin.card ?? ''}">
+  ${content}
 </section>`;
 }
