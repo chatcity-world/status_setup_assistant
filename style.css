@@ -511,13 +511,9 @@
     padding: 6px 0 0;
 }
 
-.rp-status-layout-row .rp-status-layout-heading { flex: 1 1 130px; min-width: 0; }
-.rp-status-layout-row .rp-status-layout-controls { flex: 2 1 256px; min-width: 0; }
-
 .rp-status-layout-heading,
-.rp-status-layout-controls,
-.rp-status-layout-order,
 .rp-status-layout-colors,
+.rp-status-layout-foreground,
 .rp-status-layout-color,
 .rp-status-layout-label {
     display: flex;
@@ -526,18 +522,40 @@
     gap: 4px 8px;
 }
 
-.rp-status-layout-heading { justify-content: space-between; }
+.rp-status-layout-heading { flex: 1 1 130px; min-width: 0; }
 .rp-status-layout-heading code { min-width: 0; overflow-wrap: anywhere; }
-.rp-status-layout-order { flex-wrap: nowrap; gap: 4px; }
-.rp-status-settings .rp-status-layout-controls select[data-layout-property="group"] {
+
+.rp-status-layout-order {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    max-width: 100%;
+    margin-inline-start: auto;
+}
+
+.rp-status-settings .rp-status-layout-order select[data-layout-property="group"] {
     flex: 0 1 auto;
     width: auto;
     min-height: 32px;
+    margin: 0;
+    font-size: 12px;
+}
+
+.rp-status-layout-colors,
+.rp-status-layout-foreground {
+    justify-content: flex-end;
+    gap: 4px 6px;
+    min-width: 0;
+}
+
+.rp-status-layout-colors {
     margin-inline-start: auto;
     font-size: 12px;
 }
 
-.rp-status-layout-color { flex-wrap: nowrap; }
+.rp-status-layout-colors .rp-status-layout-color { gap: 4px; }
+.rp-status-layout-color { flex-wrap: nowrap; min-width: 0; }
+.rp-status-layout-color > span:first-child { overflow-wrap: anywhere; }
 .rp-status-layout-label { position: relative; flex-wrap: nowrap; min-height: 28px; cursor: pointer; }
 .rp-status-layout-surface { width: fit-content; margin-top: 6px; }
 
@@ -594,7 +612,12 @@
     cursor: pointer;
 }
 
-.rp-status-layout-order button { min-width: 30px; }
+.rp-status-layout-order button {
+    flex: 0 0 30px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+}
 .rp-status-layout-order button:disabled { opacity: .4; cursor: default; }
 .rp-status-layout-clear { padding: 2px 6px; font-size: 12px; white-space: nowrap; }
 .rp-status-layout-clear[aria-pressed="true"] { background: var(--rp-ui-soft); }
@@ -605,6 +628,7 @@
     box-sizing: border-box;
     width: 24px;
     height: 24px;
+    flex-shrink: 0;
     border: 1px solid #8b8e94;
     border-radius: 50%;
     background: var(--rp-swatch);
@@ -699,10 +723,10 @@
 
 .rp-status-variables code { max-width: 100%; }
 
-.rp-status-settings .rp-status-code {
+.rp-status-settings textarea.rp-status-code {
     min-height: 105px;
     resize: vertical;
-    font: 400 .8rem/1.55 ui-monospace, monospace;
+    font: 400 12px/1.55 ui-monospace, monospace;
     white-space: pre-wrap;
     word-break: normal;
     overflow-wrap: anywhere;
@@ -739,15 +763,12 @@
 }
 
 @media (pointer: coarse) {
-    .rp-status-settings .rp-status-code,
-    .rp-status-settings :is(input[type="text"], input:not([type]), select, textarea) { font-size: 16px; }
+    .rp-status-settings :is(input[type="text"], input:not([type]), select, textarea:not(.rp-status-code)) { font-size: 16px; }
     .rp-status-settings .rp-status-field-editor :is(.rp-status-field-enabled, .menu_button),
     .rp-status-settings .rp-status-field-actions .menu_button,
     .rp-status-settings .rp-status-theme-choice,
     .rp-status-settings .rp-status-code-editor .menu_button,
-    .rp-status-layout-order button,
     .rp-status-layout-label,
     .rp-status-layout-color { min-height: 44px; }
-    .rp-status-layout-order button { min-width: 44px; }
     .rp-status-settings .rp-status-code-expand { min-width: 44px; }
 }
