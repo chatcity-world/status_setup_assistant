@@ -71,7 +71,11 @@ export function normalizeThemeLayout(fields, saved) {
         add(field);
         if (index >= 0) items.splice(index + 1, 0, items.pop());
     }
-    return { items, groups: Object.fromEntries(THEME_GROUPS.map(id => [id, colorSettings(saved?.groups?.[id])])) };
+    return {
+        items,
+        groups: Object.fromEntries(THEME_GROUPS.map(id => [id, colorSettings(saved?.groups?.[id])])),
+        ...(HEX_COLOR.test(saved?.background) && { background: saved.background }),
+    };
 }
 
 export function layoutBlocks(items) {
@@ -203,7 +207,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
         blocks.splice(0, 2, { html: header });
     }
     const preset = palette.scheme === 'dark' ? 'dark' : 'white';
-    return `<section lang="ko" aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${palette.background};color:${palette.text};color-scheme:${palette.scheme};font:12px/1.55 system-ui,sans-serif;overflow-wrap:anywhere">
+    return `<section lang="ko" aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font:12px/1.55 system-ui,sans-serif;overflow-wrap:anywhere">
   ${blocks.map(block => block.html).join('\n  ')}
 </section>`;
 }

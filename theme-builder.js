@@ -90,6 +90,30 @@ function serializeTheme(template) {
     return result.innerHTML.trim();
 }
 
+function parseThemeRoots(code) {
+    const template = document.createElement('template');
+    template.innerHTML = code;
+    const roots = [...template.content.children].filter(element => element.localName !== 'style');
+    return { template, roots };
+}
+
+export function themeBackground(code) {
+    const { roots } = parseThemeRoots(code);
+    const style = roots[0]?.style;
+    const color = style?.getPropertyValue('background-color') || style?.getPropertyValue('background') || '';
+    if (/^#[\da-f]{6}$/i.test(color)) return color;
+    if (/^#[\da-f]{3}$/i.test(color)) return '#' + [...color.slice(1)].map(digit => digit.repeat(2)).join('');
+    const rgb = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(color);
+    if (rgb) return '#' + rgb.slice(1).map(channel => Number(channel).toString(16).padStart(2, '0')).join('');
+}
+
+export function setThemeBackground(code, color) {
+    const { template, roots } = parseThemeRoots(code);
+    if (!roots.length) return code;
+    for (const root of roots) root.style.setProperty('background', color, 'important');
+    return serializeTheme(template);
+}
+
 export function syncThemeFields(code, previousFields, fields) {
     if (!code || code === DEFAULT_HTML) return code;
     const current = indexFields(fields);

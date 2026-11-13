@@ -24,8 +24,10 @@ function colorControls(colors, defaultBackground) {
 
 export function mountThemeLayout(container, update) {
     const list = container.querySelector('[data-layout-items]');
-    const groupList = container.querySelector('[data-layout-groups]');
     const hint = container.querySelector('[data-layout-hint]');
+    const surface = container.querySelector('[data-layout-surface]');
+    const surfaceColor = surface.querySelector('input');
+    const surfaceChip = surfaceColor.parentElement;
     const groupOptions = [['', '단독'], ...THEME_GROUPS.map(id => [id, `그룹 ${id}`])];
 
     function restoreFocus(key, group, selector) {
@@ -61,17 +63,24 @@ export function mountThemeLayout(container, update) {
         const attr = input.dataset.layoutProperty ? 'property' : 'color';
         restoreFocus(key, group, `[data-layout-${attr}="${property}"]`);
     });
+    surfaceColor.addEventListener('change', () => update({ property: 'background', value: surfaceColor.value }));
 
-    return (preset, layout, fields, disabled) => {
+    return (preset, layout, fields, disabled, customBackground) => {
         hint.hidden = Boolean(preset);
+        surface.hidden = !fields;
         list.hidden = !preset;
-        groupList.hidden = !preset;
-        container.disabled = disabled || !preset;
-        if (!preset) return;
+        container.disabled = disabled;
         const palette = THEME_PRESETS[preset];
+        const background = layout?.background ?? palette?.background ?? customBackground;
+        surfaceColor.value = background ?? '#808080';
+        surfaceChip.classList.toggle('rp-status-color-transparent', !background);
+        surfaceChip.style.setProperty('--rp-swatch', background ?? 'transparent');
+        if (!preset) return;
         const byKey = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
-        const items = layoutBlocks(layout.items.filter(item => byKey.has(item.key))).flat();
-        list.innerHTML = items.map((item, index) => {
+        const blocks = layoutBlocks(layout.items.filter(item => byKey.has(item.key)));
+        const first = blocks[0]?.[0];
+        const last = blocks.at(-1)?.at(-1);
+        function renderItem(item) {
             const field = byKey.get(item.key);
             const name = escapeHtml(field.label || field.key);
             const variable = escapeHtml(themeVariableNames(field)[0]);
@@ -79,8 +88,8 @@ export function mountThemeLayout(container, update) {
                 <div class="rp-status-layout-heading">
                     <code>{{${variable}}}</code>
                     <div class="rp-status-layout-order">
-                        <button type="button" data-layout-move="-1" aria-label="${name} 위로 이동" ${index === 0 ? 'disabled' : ''}>↑</button>
-                        <button type="button" data-layout-move="1" aria-label="${name} 아래로 이동" ${index === items.length - 1 ? 'disabled' : ''}>↓</button>
+                        <button type="button" data-layout-move="-1" aria-label="${name} 위로 이동" ${item === first ? 'disabled' : ''}>↑</button>
+                        <button type="button" data-layout-move="1" aria-label="${name} 아래로 이동" ${item === last ? 'disabled' : ''}>↓</button>
                     </div>
                 </div>
                 <div class="rp-status-layout-controls">
@@ -95,13 +104,20 @@ export function mountThemeLayout(container, update) {
                         ${ALIGN_OPTIONS.map(([id, label]) => `<option value="${id}" ${item.align === id ? 'selected' : ''}>${label}</option>`).join('')}
                     </select>
                 </div>
-                ${item.group ? '' : colorControls(itemThemeColors(palette, field, item), palette.background)}
+                ${item.group ? '' : colorControls(itemThemeColors(palette, field, item), background)}
+            </div>`;
+        }
+        list.innerHTML = blocks.map(members => {
+            const group = members[0].group;
+            const rows = members.map(renderItem).join('');
+            if (!group) return rows;
+            return `<div class="rp-status-layout-group" data-layout-group-style="${group}" role="group" aria-label="그룹 ${group}">
+                <div class="rp-status-layout-group-heading">
+                    <strong>그룹 ${group}</strong>
+                    ${colorControls(groupThemeColors(palette, layout, group), background)}
+                </div>
+                ${rows}
             </div>`;
         }).join('');
-        groupList.innerHTML = THEME_GROUPS.filter(id => items.some(item => item.group === id)).map(id => `
-            <div class="rp-status-layout-group" data-layout-group-style="${id}" role="group" aria-label="그룹 ${id} 색상">
-                <strong>그룹 ${id}</strong>
-                ${colorControls(groupThemeColors(palette, layout, id), palette.background)}
-            </div>`).join('');
     };
 }
