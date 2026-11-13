@@ -1,7 +1,8 @@
 import { generateTheme, combinedCode, syncThemeFields } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
 import { DEFAULT_HTML, themeVariableNames } from './theme.js';
-import { makeThemePreset, THEME_PRESETS } from './theme-presets.js';
+import { getLegacyThemePreset, getThemePreset, makeThemePreset, moveThemeItem, normalizeThemeLayout, THEME_PRESETS, useCustomThemeCode } from './theme-presets.js';
+import { mountThemeLayout } from './theme-layout-ui.js';
 import { createFieldKey, indexFields } from './status.js';
 
 const DISPLAY_OPTIONS = `
@@ -49,6 +50,12 @@ const HTML_OPTIONS = `
                     ${preset.label}
                 </button>`).join('')}
         </div>
+    </fieldset>
+    <fieldset class="rp-status-layout" data-theme-layout>
+        <legend>배치·색상</legend>
+        <p class="rp-status-hint" data-layout-hint hidden>화이트 또는 다크를 선택하면 항목의 배치를 편집할 수 있어요.</p>
+        <div class="rp-status-layout-list" data-layout-items></div>
+        <div class="rp-status-layout-groups" data-layout-groups></div>
     </fieldset>
     <div class="rp-status-code-editor">
         <div class="rp-status-code-heading">
@@ -286,6 +293,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const builder = root.querySelector('[data-builder]');
     const builderToggle = root.querySelector('[data-action="open-builder"]');
     const presetButtons = [...root.querySelectorAll('[data-theme-preset]')];
+    const layoutEditor = root.querySelector('[data-theme-layout]');
     const themeDescription = root.querySelector('#rp-theme-request');
     const generateButton = builder.querySelector('button');
     const themeResult = builder.querySelector('[data-theme-result]');
@@ -298,40 +306,63 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     let themeGeneration;
     let previewValues = {};
     let previewFrame = 0;
-    let presetFields;
-    let presetCodes;
+    let draftPreset;
+    let draftLayouts = {};
+    const renderLayoutEditor = mountThemeLayout(layoutEditor, changeLayout);
 
     function paintPreview() {
         if (!settings || themePanel.hidden || !icon.classList.contains('up') || previewFrame) return;
         previewFrame = requestAnimationFrame(() => {
             previewFrame = 0;
             if (!settings || themePanel.hidden || !icon.classList.contains('up')) return;
-            const hasValues = settings.fields.some(field => field.enabled && Object.hasOwn(previewValues, field.key));
-            previewLabel.textContent = hasValues ? '미리보기' : '미리보기 · 예시 값';
-            const values = hasValues ? previewValues : Object.fromEntries(settings.fields.filter(field => field.enabled).map(field => {
+            const enabled = settings.fields.filter(field => field.enabled);
+            const hasValues = enabled.some(field => Object.hasOwn(previewValues, field.key));
+            const sample = Object.fromEntries(enabled.map(field => {
                 const fallback = field.type === 'gauge' ? 50 : '예시';
-                return [field.key, Object.hasOwn(SAMPLE_VALUES, field.key) ? SAMPLE_VALUES[field.key] : fallback];
+                const sampleKey = field.variable ?? field.key;
+                return [field.key, Object.hasOwn(SAMPLE_VALUES, sampleKey) ? SAMPLE_VALUES[sampleKey] : fallback];
             }));
+            const previewingPreset = Boolean(draftPreset);
+            const values = !hasValues || previewingPreset ? { ...sample, ...previewValues } : previewValues;
+            const hasSample = (!hasValues || previewingPreset) && enabled.some(field => !Object.hasOwn(previewValues, field.key));
+            previewLabel.textContent = hasSample ? '미리보기 · 예시 값 포함' : '미리보기';
             renderCard(previewCard, settings.fields, values, html.value || DEFAULT_HTML, '');
         });
     }
 
     function syncPresetSelection() {
-        if (settings && presetFields !== settings.fields) {
-            presetFields = settings.fields;
-            presetCodes = Object.fromEntries(Object.entries(THEME_PRESETS).map(([key, preset]) => [key, makeThemePreset(preset, presetFields)]));
-        }
-        const code = html.value.trim();
         for (const button of presetButtons) {
-            const selected = settings && code === presetCodes[button.dataset.themePreset];
-            button.setAttribute('aria-pressed', String(Boolean(selected)));
+            button.setAttribute('aria-pressed', String(button.dataset.themePreset === draftPreset));
         }
+        renderLayoutEditor(draftPreset, draftLayouts[draftPreset], settings?.fields, Boolean(themeGeneration));
     }
 
     function updateThemeDraft(code) {
         html.value = code;
+        draftPreset = getThemePreset(code) ?? getLegacyThemePreset(code);
+        if (draftPreset) draftLayouts[draftPreset] = normalizeThemeLayout(settings.fields, draftLayouts[draftPreset]);
         syncPresetSelection();
         paintPreview();
+    }
+
+    function showPreset(preset) {
+        updateThemeDraft(makeThemePreset(THEME_PRESETS[preset], settings.fields, draftLayouts[preset]));
+    }
+
+    function changeLayout({ key, direction, group, property, value }) {
+        if (!draftPreset || themeGeneration) return;
+        const layout = draftLayouts[draftPreset];
+        const index = layout.items.findIndex(item => item.key === key);
+        if (direction) {
+            const visibleKeys = new Set(settings.fields.filter(field => field.enabled).map(field => field.key));
+            layout.items = moveThemeItem(layout.items, key, direction, visibleKeys);
+        } else if (group) {
+            layout.groups[group][property] = value;
+        } else if (index >= 0) {
+            layout.items[index][property] = value;
+        }
+        showPreset(draftPreset);
+        showResult('');
     }
 
     function syncControls() {
@@ -351,6 +382,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         generateButton.textContent = themeGeneration ? '생성 중…' : '테마 생성';
         html.readOnly = Boolean(themeGeneration);
         for (const button of presetButtons) button.disabled = Boolean(themeGeneration);
+        layoutEditor.disabled = Boolean(themeGeneration);
     }
 
     function syncCharacters() {
@@ -412,6 +444,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         if (settings !== next || editedAvatar !== avatar) {
             editedAvatar = avatar;
             settings = next;
+            draftLayouts = structuredClone(next?.themeLayouts ?? {});
             updateThemeDraft(next ? combinedCode(next) : '');
             fields.replaceChildren();
             if (next) {
@@ -502,13 +535,26 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     });
     drawerObserver.observe(icon, { attributes: true, attributeFilter: ['class'] });
     html.addEventListener('input', () => {
+        if (draftPreset || getThemePreset(html.value) || getLegacyThemePreset(html.value)) {
+            const code = html.value;
+            const start = html.selectionStart;
+            const end = html.selectionEnd;
+            html.value = useCustomThemeCode(code);
+            const marker = html.value.indexOf(' data-rp-status-custom');
+            const added = html.value.length - code.length;
+            if (added > 0 && marker >= 0 && typeof html.setSelectionRange === 'function') {
+                const shift = position => position < marker ? position : position + added;
+                html.setSelectionRange(shift(start), shift(end));
+            }
+            draftPreset = undefined;
+        }
         syncPresetSelection();
         paintPreview();
     });
     for (const button of presetButtons) {
         button.addEventListener('click', () => {
             if (!settings || themeGeneration) return;
-            updateThemeDraft(presetCodes[button.dataset.themePreset]);
+            showPreset(button.dataset.themePreset);
             showResult('');
         });
     }
@@ -571,10 +617,12 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         }
         const savedCode = combinedCode(settings);
         const editedCode = html.value;
+        const editedPreset = draftPreset;
         if (!saveChanges({ fields: newFields })) return;
         rows.forEach((row, index) => { row.dataset.key = settings.fields[index].key; });
         showThemeVariables(variables, settings.fields);
-        updateThemeDraft(editedCode === savedCode ? combinedCode(settings) : syncThemeFields(editedCode, previousFields, settings.fields));
+        if (editedPreset && getThemePreset(editedCode)) showPreset(editedPreset);
+        else updateThemeDraft(editedCode === savedCode ? combinedCode(settings) : syncThemeFields(editedCode, previousFields, settings.fields));
         showResult('항목을 저장했습니다.');
     });
 
@@ -586,7 +634,9 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
                 html.focus();
                 return;
             }
-            if (saveChanges({ html: html.value, css: '' })) {
+            if (draftPreset) showPreset(draftPreset);
+            if (saveChanges({ html: html.value, css: '', themeLayouts: structuredClone(draftLayouts) })) {
+                draftLayouts = structuredClone(settings.themeLayouts);
                 updateThemeDraft(combinedCode(settings));
                 showResult('HTML을 저장했습니다.');
             }

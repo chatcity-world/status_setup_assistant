@@ -1,6 +1,7 @@
 import { assignThemeVariables, DEFAULT_FIELDS } from './status.js';
 import { DEFAULT_HTML, DEFAULT_THEME, LEGACY_DEFAULT_HTML } from './theme.js';
 import { syncThemeFields } from './theme-builder.js';
+import { getThemePreset, makeThemePreset, normalizeThemeLayout, THEME_PRESETS } from './theme-presets.js';
 
 const defaults = {
     enabled: true,
@@ -10,6 +11,7 @@ const defaults = {
     html: DEFAULT_HTML,
     css: '',
     theme: DEFAULT_THEME,
+    themeLayouts: {},
 };
 
 const previousDefaultKeys = ['날짜', '시간', '날씨', '기온', '장소', '옷차림', '포즈', '커뮤니티글', '속마음', '애정', '죄책감', '욕구'];
@@ -33,7 +35,13 @@ function copySettings(saved) {
         settings.fields = DEFAULT_FIELDS.map(field => ({ ...field, key: field.key === '호감도' ? '애정' : field.key }));
     }
     const fields = assignThemeVariables(settings.fields);
-    settings.html = syncThemeFields(settings.html, settings.fields, fields);
+    const preset = getThemePreset(settings.html);
+    if (preset && settings.themeLayouts[preset]) {
+        settings.themeLayouts[preset] = normalizeThemeLayout(fields, settings.themeLayouts[preset]);
+        settings.html = makeThemePreset(THEME_PRESETS[preset], fields, settings.themeLayouts[preset]);
+    } else {
+        settings.html = syncThemeFields(settings.html, settings.fields, fields);
+    }
     settings.fields = fields;
     return settings;
 }
@@ -75,8 +83,16 @@ export function saveProfileSettings(shared, avatar, changes) {
     if (!settings) return false;
     if (changes.fields || changes.html !== undefined) {
         const fields = changes.fields ? assignThemeVariables(changes.fields) : settings.fields;
-        const html = syncThemeFields(changes.html ?? settings.html, settings.fields, fields);
-        changes = { ...changes, fields, html };
+        const source = changes.html ?? settings.html;
+        const themeLayouts = { ...(changes.themeLayouts ?? settings.themeLayouts) };
+        const preset = getThemePreset(source);
+        for (const key of Object.keys(THEME_PRESETS)) {
+            if (themeLayouts[key]) themeLayouts[key] = normalizeThemeLayout(fields, themeLayouts[key]);
+        }
+        const html = preset && themeLayouts[preset]
+            ? makeThemePreset(THEME_PRESETS[preset], fields, themeLayouts[preset])
+            : syncThemeFields(source, settings.fields, fields);
+        changes = { ...changes, fields, html, themeLayouts };
     }
     Object.assign(settings, changes);
     return true;

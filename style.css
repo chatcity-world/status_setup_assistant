@@ -418,7 +418,8 @@
     gap: 12px;
 }
 
-.rp-status-theme-presets {
+.rp-status-theme-presets,
+.rp-status-layout {
     min-inline-size: 0;
     margin: 0;
     padding: 0;
@@ -426,6 +427,7 @@
 }
 
 .rp-status-theme-presets legend,
+.rp-status-layout legend,
 .rp-status-code-heading label {
     width: auto;
     margin: 0;
@@ -474,6 +476,124 @@
     border: 1px solid #8b8e94;
     border-radius: 50%;
 }
+
+.rp-status-layout-list,
+.rp-status-layout-groups {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.rp-status-layout-row,
+.rp-status-layout-group {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid var(--rp-ui-border);
+    border-radius: 8px;
+}
+
+.rp-status-layout-heading,
+.rp-status-layout-controls,
+.rp-status-layout-order,
+.rp-status-layout-colors,
+.rp-status-layout-color,
+.rp-status-layout-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+.rp-status-layout-heading { justify-content: space-between; }
+.rp-status-layout-heading code { min-width: 0; overflow-wrap: anywhere; }
+.rp-status-layout-order { flex-wrap: nowrap; gap: 4px; }
+.rp-status-layout-controls .text_pole { flex: 1 1 86px; width: auto; }
+.rp-status-layout-label { position: relative; flex-wrap: nowrap; min-height: 28px; cursor: pointer; }
+
+.rp-status-layout-label input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+}
+
+.rp-status-layout-track {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    width: 32px;
+    height: 18px;
+    padding: 2px;
+    border: 1px solid var(--rp-ui-border);
+    border-radius: 999px;
+    background: var(--rp-ui-soft);
+    pointer-events: none;
+}
+
+.rp-status-layout-track::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.rp-status-layout-label input:checked + .rp-status-layout-track {
+    justify-content: flex-end;
+    background: var(--rp-ui-selected);
+}
+
+.rp-status-layout-label input:focus-visible + .rp-status-layout-track {
+    outline: 2px solid var(--SmartThemeQuoteColor, #f0bc9c);
+    outline-offset: 2px;
+}
+
+.rp-status-layout-order button,
+.rp-status-layout-clear {
+    min-height: 28px;
+    padding: 3px 7px;
+    border: 1px solid var(--rp-ui-border);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.rp-status-layout-order button { min-width: 30px; }
+.rp-status-layout-order button:disabled { opacity: .4; cursor: default; }
+.rp-status-layout-clear[aria-pressed="true"] { background: var(--rp-ui-soft); }
+
+.rp-status-color-chip {
+    position: relative;
+    display: block;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    border: 1px solid #8b8e94;
+    border-radius: 50%;
+    background: var(--rp-swatch);
+}
+
+.rp-status-color-transparent {
+    background: repeating-conic-gradient(#aeb0b5 0 25%, #fff 0 50%) 0 0 / 8px 8px;
+}
+
+.rp-status-settings .rp-status-color-chip input {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.rp-status-color-chip:focus-within { outline: 2px solid var(--SmartThemeQuoteColor, #f0bc9c); outline-offset: 2px; }
 
 .rp-status-code-editor {
     gap: 8px;
@@ -551,5 +671,11 @@
     .rp-status-settings .rp-status-field-editor :is(.rp-status-field-enabled, .menu_button),
     .rp-status-settings .rp-status-field-actions .menu_button,
     .rp-status-settings .rp-status-theme-choice,
-    .rp-status-settings .rp-status-code-editor .menu_button { min-height: 44px; }
+    .rp-status-settings .rp-status-code-editor .menu_button,
+    .rp-status-layout-order button,
+    .rp-status-layout-clear,
+    .rp-status-layout-controls .text_pole,
+    .rp-status-layout-label,
+    .rp-status-layout-color { min-height: 44px; }
+    .rp-status-layout-order button { min-width: 44px; }
 }

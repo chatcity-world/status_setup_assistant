@@ -158,7 +158,9 @@ function htmlFor(template, fields, values) {
     for (const row of source.content.querySelectorAll('[data-rp-status-field]')) {
         const key = row.dataset.rpStatusField;
         const field = variables.get(key);
-        if (!field?.enabled || field.key !== key) row.remove();
+        const missingValue = row.hasAttribute('data-rp-status-hide-empty')
+            && (!Object.hasOwn(values, key) || values[key] == null || values[key] === '');
+        if (!field?.enabled || field.key !== key || missingValue) row.remove();
     }
     for (const group of [...source.content.querySelectorAll('[data-rp-status-group]')].reverse()) {
         if (!group.childElementCount) group.remove();
