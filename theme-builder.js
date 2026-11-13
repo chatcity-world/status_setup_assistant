@@ -53,9 +53,9 @@ export async function generateTheme(description, fields) {
     if (context.onlineStatus === 'no_connection') throw new Error('실리태번의 AI 연결을 먼저 설정해 주세요.');
     const active = fields.filter(field => field.enabled).map(({key,label,type}) => ({key,label,type}));
     const prompt = [
-        'Create a compact, polished roleplay status card. Return only one complete HTML fragment.',
+        'Create a compact roleplay status card that starts with its fields, with no generic heading. Return only one complete HTML fragment.',
         'Use inline style attributes for ALL styling. No style tags, scripts, external resources, event handlers, forms, document wrapper, fixed positioning or viewport units. Use responsive wrapping layouts that fit 280px. Make background match the requested theme using CSS colors, gradients and shadows. Ensure readable contrast.',
-        'Prefer the automatic fields placeholder: write 항목들 between two opening braces and two closing braces, on its own line inside the card. It inserts all fields with their exact labels. Alternatively include every provided field with its exact label and its key between double braces. Put placeholders in text nodes only. For gauges, put % after the numeric placeholder and optionally use a second placeholder with _게이지 appended to the key. Do not invent values or other placeholders.',
+        'Prefer one automatic fields placeholder: write 항목들 once between two opening braces and two closing braces, on its own line inside the card. It inserts all fields with their exact labels. Alternatively include every provided field with its exact label and its key between double braces. Put placeholders in text nodes only. For gauges, put % after the numeric placeholder and optionally use a second placeholder with _게이지 appended to the key. Do not invent values or other placeholders.',
         'Fields: '+JSON.stringify(active),
         'Theme request: '+description,
     ].join('\n');

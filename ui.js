@@ -89,21 +89,45 @@ function setupTabs(root) {
 function addFieldRow(container, field = { label: '', type: 'text', enabled: true }) {
     const row = document.createElement('div');
     row.className = 'rp-status-field-editor';
+    row.setAttribute('role', 'group');
     if (field.key) row.dataset.key = field.key;
     row.innerHTML = `
+        <div class="rp-status-field-header">
+            <strong data-field-title></strong>
+            <div class="rp-status-field-tools">
+                <label class="rp-status-field-enabled"><input type="checkbox" data-field="enabled"> 표시</label>
+                <button class="menu_button" type="button" data-field-delete>삭제</button>
+            </div>
+        </div>
         <label>표시 이름<input class="text_pole" data-field="label" maxlength="48" required autocomplete="off"></label>
         <label>형식<select class="text_pole" data-field="type"><option value="text">텍스트</option><option value="gauge">게이지</option></select></label>
-        <label class="rp-status-field-rule">AI 작성 규칙 (선택)<input class="text_pole" data-field="rule" placeholder="AI에게 전달할 해당 변수에 대한 짧은 설명" autocomplete="off"></label>
-        <label class="rp-status-field-enabled"><input type="checkbox" data-field="enabled"> 표시</label>
-        <button class="menu_button" type="button">삭제</button>`;
+        <label class="rp-status-field-rule">AI 작성 규칙 (선택)<textarea class="text_pole" data-field="rule" rows="2" placeholder="AI에게 전달할 해당 변수에 대한 짧은 설명"></textarea></label>`;
     for (const input of row.querySelectorAll('[data-field]')) {
         const value = field[input.dataset.field];
         if (input.type === 'checkbox') input.checked = value;
         else input.value = value ?? '';
     }
     const label = row.querySelector('[data-field="label"]');
-    label.addEventListener('input', () => label.setCustomValidity(''));
-    row.querySelector('button').addEventListener('click', () => row.remove());
+    const heading = row.querySelector('[data-field-title]');
+    const remove = row.querySelector('[data-field-delete]');
+    const updateHeading = () => {
+        const name = label.value.trim() || '새 항목';
+        heading.textContent = name;
+        row.setAttribute('aria-label', name);
+        remove.setAttribute('aria-label', name + ' 삭제');
+    };
+    updateHeading();
+    label.addEventListener('input', () => {
+        label.setCustomValidity('');
+        updateHeading();
+    });
+    remove.addEventListener('click', () => {
+        const next = row.nextElementSibling ?? row.previousElementSibling;
+        const focusTarget = next?.querySelector('[data-field="label"]')
+            ?? container.closest('form').querySelector('[data-action="add-field"]');
+        row.remove();
+        focusTarget.focus();
+    });
     container.append(row);
     return label;
 }
@@ -147,10 +171,20 @@ async function copyText(textarea) {
 }
 
 export function mountSettings(target, { getCharacters, update, saveCurrent, removeProfile, renderCard }) {
-    const root = document.createElement('details');
+    const drawer = document.createElement('div');
+    drawer.className = 'inline-drawer';
+    drawer.innerHTML = `
+        <div class="inline-drawer-toggle inline-drawer-header" role="button" tabindex="0" aria-expanded="false" aria-controls="rp-status-drawer-content">
+            <b>📊 헬프미상태창</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down" aria-hidden="true"></div>
+        </div>
+        <div class="inline-drawer-content" id="rp-status-drawer-content"></div>`;
+    const header = drawer.firstElementChild;
+    const icon = header.querySelector('.inline-drawer-icon');
+    const content = drawer.lastElementChild;
+    const root = document.createElement('div');
     root.className = 'rp-status-settings';
     root.innerHTML = `
-        <summary>📊 헬프미상태창</summary>
         <div class="rp-status-settings-body">
             <label class="rp-status-switch">
                 <span>상태창 사용</span>
@@ -207,7 +241,8 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
                 </div>
             </div>
         </div>`;
-    target.append(root);
+    content.append(root);
+    target.append(drawer);
     setupTabs(root);
 
     const scope = root.querySelector('#rp-status-scope');
@@ -248,7 +283,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     let previewFrame = 0;
 
     function paintPreview() {
-        if (!settings || !root.open || previewFrame) return;
+        if (!settings || !icon.classList.contains('up') || previewFrame) return;
         previewFrame = requestAnimationFrame(() => {
             previewFrame = 0;
             if (!settings) return;
@@ -415,7 +450,18 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             if (saveChanges({ [input.dataset.setting]: input.type === 'checkbox' ? input.checked : input.value })) syncControls();
         });
     }
-    root.addEventListener('toggle', () => { if (root.open) syncPanel(); });
+    header.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        if (!event.repeat) header.click();
+    });
+    // SillyTavern toggles the icon and body through its shared drawer handler.
+    const drawerObserver = new MutationObserver(() => {
+        const open = icon.classList.contains('up');
+        header.setAttribute('aria-expanded', String(open));
+        if (open) syncPanel();
+    });
+    drawerObserver.observe(icon, { attributes: true, attributeFilter: ['class'] });
     html.addEventListener('input', paintPreview);
     builder.addEventListener('submit', async event => {
         event.preventDefault();

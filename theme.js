@@ -1,7 +1,7 @@
 export const DEFAULT_HTML = `<section class="rp-card" aria-label="상태창" style="padding:14px;border-radius:12px;background:#fff3d9;color:#26110e;font:14px/1.5 system-ui,sans-serif">
-  <div style="font-weight:700;margin-bottom:10px">상태창</div>
   {{항목들}}
 </section>`;
+export const LEGACY_DEFAULT_HTML = DEFAULT_HTML.replace('  {{항목들}}', '  <div style="font-weight:700;margin-bottom:10px">상태창</div>\n  {{항목들}}');
 
 export const PALETTES = {
     cream: { label: '버터 크림', background: '#fff3d9', accent: '#8b4b31' },
@@ -96,16 +96,20 @@ function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ESCAPES[char]);
 }
 
-function gauge(label, value) {
-    return `<progress class="rp-gauge" style="width:100%;height:6px;accent-color:currentColor" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
+function gauge(label, value, compact = false) {
+    const layout = compact ? 'display:inline-block;width:40px;max-width:100%;vertical-align:middle' : 'width:100%';
+    return `<progress class="rp-gauge" style="${layout};height:6px;accent-color:currentColor" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
 }
 
 function htmlFor(template, fields, values) {
     const filled = fields.filter(field => field.enabled && Object.hasOwn(values, field.key));
     const rows = filled.map(({ key, label, type }) => {
         const value = values[key];
-        const detail = type === 'gauge' ? `${value}%${gauge(label, value)}` : escapeHtml(value);
-        return `<div class="rp-field"><dt class="rp-label" style="font-size:12px;opacity:.75">${escapeHtml(label)}</dt><dd class="rp-value" style="margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd></div>`;
+        const detail = type === 'gauge' ? `${value}% ${gauge(label, value, true)}` : escapeHtml(value);
+        return `<div class="rp-field" style="display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%">
+            <dt class="rp-label" style="flex:none;max-width:45%;font-size:.85em;opacity:.75;overflow-wrap:anywhere">${escapeHtml(label)}</dt>
+            <dd class="rp-value" style="min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd>
+        </div>`;
     }).join('');
     const variables = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
     const source = document.createElement('template');
@@ -115,8 +119,13 @@ function htmlFor(template, fields, values) {
     while (walker.nextNode()) {
         if (walker.currentNode.data.includes('{{')) nodes.push(walker.currentNode);
     }
+    let renderedFields = false;
     function resolve(key) {
-        if (key === '항목들') return rows ? `<dl class="rp-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(118px,100%),1fr));gap:8px 14px;margin:0">${rows}</dl>` : '<p class="rp-empty">아직 입력된 상태가 없어요.</p>';
+        if (key === '항목들') {
+            if (renderedFields) return '';
+            renderedFields = true;
+            return rows ? `<dl class="rp-grid" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0">${rows}</dl>` : '<p class="rp-empty">아직 입력된 상태가 없어요.</p>';
+        }
         if (key.endsWith('_게이지')) {
             const valueKey = key.slice(0, -'_게이지'.length);
             const field = variables.get(valueKey);
@@ -139,7 +148,12 @@ export function createCardRenderer() {
         && 'adoptedStyleSheets' in ShadowRoot.prototype && 'replaceSync' in CSSStyleSheet.prototype;
     const sheet = canShareCSS ? new CSSStyleSheet() : null;
     let currentCSS;
-    const baseCSS = ':host{display:block;min-width:0;color:inherit;font:inherit}*,*::before,*::after{box-sizing:border-box}img{max-width:100%;height:auto}';
+    const baseCSS = ':host{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;color:inherit;font:inherit}*,*::before,*::after{box-sizing:border-box}img{max-width:100%;height:auto}';
+    const outerStyles = Object.entries({
+        width: '100%', 'min-width': '0', 'max-width': '100%',
+        'inline-size': '100%', 'min-inline-size': '0', 'max-inline-size': '100%',
+        'margin-inline': '0', 'box-sizing': 'border-box',
+    });
 
     return (host, fields, values, html, css) => {
         const signature = JSON.stringify(values);
@@ -153,12 +167,21 @@ export function createCardRenderer() {
         legacyStyles.forEach(style => style.remove());
         const wrapper = document.createElement('div');
         wrapper.append(legacy.content);
+        const outer = wrapper.firstElementChild;
+        const headings = wrapper.querySelectorAll('header, h1, h2, h3, h4, .rp-title');
+        for (const title of [outer, outer?.firstElementChild, ...headings]) {
+            if (title?.textContent.trim() === '상태창') title.remove();
+        }
         const fragment = SillyTavern.libs.DOMPurify.sanitize(htmlFor(wrapper.innerHTML, fields, values), {
             ALLOWED_TAGS: HTML_TAGS,
             ALLOWED_ATTR: HTML_ATTRIBUTES,
             ALLOW_DATA_ATTR: false,
             RETURN_DOM_FRAGMENT: true,
         });
+        for (const element of fragment.children) {
+            // Fit the outer theme to the host column, including older fixed-width themes.
+            for (const [property, value] of outerStyles) element.style.setProperty(property, value, 'important');
+        }
         const themeStyle = baseCSS + '\n' + (css || '') + '\n' + embeddedCSS;
         if (sheet) {
             if (currentCSS !== themeStyle) {

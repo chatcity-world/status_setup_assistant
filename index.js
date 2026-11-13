@@ -18,6 +18,73 @@ let frame = 0;
 let generation;
 let lockedScroll = false;
 let pendingSwipe;
+let messageCards = [];
+let alignmentFrame = 0;
+const observedColumns = new Set();
+const textResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(requestAlignment) : null;
+
+function contentEdges(element) {
+    const { left, right } = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const pixels = property => Number.parseFloat(style[property]) || 0;
+    return {
+        left: left + pixels('borderLeftWidth') + pixels('paddingLeft'),
+        right: right - pixels('borderRightWidth') - pixels('paddingRight'),
+    };
+}
+
+function textEdges(body, columns) {
+    let left = Infinity;
+    let right = -Infinity;
+    for (const paragraph of body.querySelectorAll('p')) {
+        if (!paragraph.textContent.trim() || !paragraph.getClientRects().length) continue;
+        if (body.contains(paragraph.closest('blockquote, details, table, li, [data-type="assistant_note"]'))) continue;
+        const edges = contentEdges(paragraph);
+        if (edges.right <= edges.left) continue;
+        columns.add(paragraph);
+        left = Math.min(left, edges.left);
+        right = Math.max(right, edges.right);
+    }
+    if (right <= left) return contentEdges(body);
+    return { left, right };
+}
+
+function alignMessageCards() {
+    const columns = new Set();
+    const insets = [];
+    // Measure the prose after all cards have been placed, then apply the new insets together.
+    for (const { body, frame } of messageCards) {
+        if (!frame.isConnected) continue;
+        columns.add(body);
+        const prose = textEdges(body, columns);
+        const available = contentEdges(frame);
+        if (Math.min(prose.right, available.right) <= Math.max(prose.left, available.left)) continue;
+        insets.push({ frame, left: Math.max(0, prose.left - available.left), right: Math.max(0, available.right - prose.right) });
+    }
+    for (const { frame, left, right } of insets) {
+        frame.style.setProperty('--rp-status-text-left', `${left}px`);
+        frame.style.setProperty('--rp-status-text-right', `${right}px`);
+    }
+    if (!textResizeObserver) return;
+    for (const column of observedColumns) {
+        if (columns.has(column)) continue;
+        textResizeObserver.unobserve(column);
+        observedColumns.delete(column);
+    }
+    for (const column of columns) {
+        if (observedColumns.has(column)) continue;
+        textResizeObserver.observe(column);
+        observedColumns.add(column);
+    }
+}
+
+function requestAlignment() {
+    if (alignmentFrame) return;
+    alignmentFrame = requestAnimationFrame(() => {
+        alignmentFrame = 0;
+        alignMessageCards();
+    });
+}
 
 function getChatKey(context) {
     const id = context.getCurrentChatId();
@@ -67,26 +134,37 @@ function render() {
     const shouldFollow = wasAtBottom && !lockedScroll;
     lockedScroll = false;
 
+    messageCards = [];
     for (const message of chatRoot?.children ?? []) {
         if (!message.matches('.mes[mesid]')) continue;
         const body = message.querySelector('.mes_text');
-        let card = body?.parentElement.querySelector(':scope > .rp-status-message');
+        const existing = [...message.querySelectorAll('.rp-status-message')];
         const row = model.cards.get(Number(message.getAttribute('mesid')));
         const shouldShow = enabled && row && (settings.mode === 'each' || row.changed);
         if (!body || !shouldShow) {
-            card?.remove();
+            existing.forEach(card => card.remove());
             continue;
         }
 
-        if (!card) {
-            card = document.createElement('div');
-            card.className = 'rp-status-message';
+        let frame = existing.find(item => item.parentElement === body.parentElement
+            && item.firstElementChild?.classList.contains('rp-status-message-card'));
+        for (const item of existing) {
+            if (item !== frame) item.remove();
+        }
+        if (!frame) {
+            frame = document.createElement('div');
+            frame.className = 'rp-status-message';
+            const card = document.createElement('div');
+            card.className = 'rp-status-message-card';
+            frame.append(card);
         }
         const above = settings.position === 'above';
-        if (above && card.nextElementSibling !== body) body.before(card);
-        if (!above && card.previousElementSibling !== body) body.after(card);
-        renderCard(card, settings.fields, row.values, settings.html, settings.css);
+        if (above && frame.nextElementSibling !== body) body.before(frame);
+        if (!above && frame.previousElementSibling !== body) body.after(frame);
+        renderCard(frame.firstElementChild, settings.fields, row.values, settings.html, settings.css);
+        messageCards.push({ body, frame });
     }
+    alignMessageCards();
 
     updateSettingsPanel?.({ shared: sharedSettings, activeAvatar: currentAvatar(context), values: model.values });
     if (shouldFollow) chatRoot.scrollTop = chatRoot.scrollHeight;
@@ -235,9 +313,18 @@ function initialize() {
     }
     if (chatRoot) {
         const observer = new MutationObserver(records => {
-            if (records.some(record => record.target === chatRoot || record.target.parentElement === chatRoot)) requestRender();
+            for (const record of records) {
+                if (record.target === chatRoot || record.target.parentElement === chatRoot
+                    || (record.type === 'childList' && [...record.addedNodes, ...record.removedNodes].some(node =>
+                        node.matches?.('.mes_text, .rp-status-message') || node.querySelector?.('.mes_text, .rp-status-message')))) {
+                    requestRender();
+                    return;
+                }
+            }
+            if (records.some(record => record.target.closest?.('.mes_text'))) requestAlignment();
         });
         observer.observe(chatRoot, { childList: true, subtree: true, attributes: true, attributeFilter: ['mesid', 'swipeid'] });
+        window.addEventListener('resize', requestAlignment);
     }
     requestRender();
 }

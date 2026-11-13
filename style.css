@@ -1,6 +1,26 @@
 .rp-status-message {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
     margin-block: 10px;
     min-width: 0;
+    align-self: start;
+    justify-self: start;
+}
+
+.rp-status-message > .rp-status-message-card,
+.rp-status-preview > [data-preview-card] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.rp-status-message > .rp-status-message-card {
+    width: auto;
+    margin-left: var(--rp-status-text-left, 0px);
+    margin-right: var(--rp-status-text-right, var(--mes-right-spacing, 0px));
 }
 
 .rp-status-settings {
@@ -15,21 +35,10 @@
     white-space: normal;
 }
 
-.rp-status-settings {
-    width: 100%;
-    border: 0;
-    margin-block: 4px;
-}
-
-.rp-status-settings > summary {
-    padding: 9px 10px;
-    cursor: pointer;
-    font-weight: 700;
-}
-
 .rp-status-settings-body,
 .rp-status-profile-editor {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     min-width: 0;
 }
@@ -328,10 +337,35 @@
 .rp-status-field-editor {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: end;
-    gap: 6px 8px;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--rp-ui-border);
+    align-items: start;
+    gap: 10px 8px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--rp-ui-border);
+    border-radius: 8px;
+    background: var(--rp-ui-soft);
+}
+
+.rp-status-field-header {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+}
+
+.rp-status-field-header strong {
+    flex: 1 1 72px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.rp-status-field-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
 }
 
 .rp-status-field-editor .rp-status-field-enabled {
@@ -343,12 +377,12 @@
 
 .rp-status-field-rule { grid-column: 1 / -1; }
 
-.rp-status-field-rule input::placeholder { font-size: .875em; }
+.rp-status-field-rule textarea { resize: vertical; }
+.rp-status-field-rule textarea::placeholder { font-size: .875em; }
 
 .rp-status-fields {
-    max-height: min(360px, 46vh);
-    overflow: auto;
-    padding: 2px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
 }
 
 .rp-status-settings :is(input:not([type="checkbox"]), select, textarea) {
@@ -419,7 +453,11 @@
 .rp-status-preview {
     border-top: 1px solid var(--rp-ui-border);
     padding-top: 8px;
+    width: 100%;
+    min-width: 0;
 }
+
+.rp-status-preview > [data-preview-card] { width: 100%; margin: 0; }
 
 .rp-status-preview-label {
     color: var(--rp-ui-muted);
@@ -429,5 +467,7 @@
 
 @media (pointer: coarse) {
     .rp-status-settings .rp-status-code,
-    .rp-status-settings :is(input[type="text"], input:not([type]), select) { font-size: 16px; }
+    .rp-status-settings :is(input[type="text"], input:not([type]), select, textarea) { font-size: 16px; }
+    .rp-status-settings .rp-status-field-editor :is(.rp-status-field-enabled, .menu_button),
+    .rp-status-settings .rp-status-field-actions .menu_button { min-height: 44px; }
 }

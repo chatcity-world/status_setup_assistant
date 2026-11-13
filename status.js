@@ -182,7 +182,7 @@ export function promptFor(values, fields, { character, user } = {}) {
         ...(rules.length ? [`Apply these writing rules only to the corresponding state values: ${promptJson(Object.fromEntries(rules))}`] : []),
         'Write the roleplay response first. If the response changes the scene, append one update block on its own lines using the exact markers below. Replace {} with a JSON object containing only the keys that changed. Use strings for text, integers for gauges, and null to clear a value.',
         'Keep unchanged values. Leave uncertain facts unset. Do not assign private thoughts, decisions, or actions to the user. If using 속마음, it refers to the speaking character.',
-        'If no value changes, omit the block.',
+        'If no value changes, omit the block. Keep any separate status summary out of the visible roleplay response.',
         '[[RP_STATUS]]\n{}\n[[/RP_STATUS]]',
     ].join('\n');
 }

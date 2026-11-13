@@ -1,5 +1,5 @@
 import { DEFAULT_FIELDS } from './status.js';
-import { DEFAULT_HTML, DEFAULT_THEME } from './theme.js';
+import { DEFAULT_HTML, DEFAULT_THEME, LEGACY_DEFAULT_HTML } from './theme.js';
 
 const defaults = {
     enabled: true,
@@ -27,6 +27,7 @@ function copySettings(saved) {
     for (const [key, value] of Object.entries(defaults)) {
         settings[key] = structuredClone(saved?.[key] ?? value);
     }
+    if (settings.html === LEGACY_DEFAULT_HTML) settings.html = DEFAULT_HTML;
     if (usesPreviousDefaults(settings)) {
         // Keep the original affection key so previously recorded values still render.
         settings.fields = DEFAULT_FIELDS.map(field => ({
