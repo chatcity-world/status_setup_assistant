@@ -346,7 +346,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             const previewingPreset = Boolean(draftPreset);
             const values = !hasValues || previewingPreset ? { ...sample, ...previewValues } : previewValues;
             const hasSample = (!hasValues || previewingPreset) && enabled.some(field => !Object.hasOwn(previewValues, field.key));
-            previewLabel.textContent = hasSample ? '미리보기 · 예시 값 포함' : '미리보기';
+            previewLabel.textContent = hasSample ? '미리보기 · 내용은 예시' : '미리보기';
             renderCard(previewCard, settings.fields, values, html.value || DEFAULT_HTML, '');
         });
     }
