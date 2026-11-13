@@ -535,7 +535,7 @@
 
 .rp-status-settings .rp-status-layout-order select[data-layout-property="group"] {
     flex: 0 1 auto;
-    width: auto;
+    width: 52px;
     min-height: 32px;
     margin: 0;
     font-size: 12px;
