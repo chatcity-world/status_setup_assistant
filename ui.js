@@ -219,7 +219,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     drawer.className = 'inline-drawer';
     drawer.innerHTML = `
         <div class="inline-drawer-toggle inline-drawer-header" role="button" tabindex="0" aria-expanded="false" aria-controls="rp-status-drawer-content">
-            <b>📊 헬프미상태창</b>
+            <b>🗒️ 상태창 헬퍼</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down" aria-hidden="true"></div>
         </div>
         <div class="inline-drawer-content" id="rp-status-drawer-content"></div>`;
