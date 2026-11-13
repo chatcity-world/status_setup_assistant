@@ -38,7 +38,7 @@ const SLACK = {
 export const THEME_PRESETS = {
     white: {
         id: 'white', label: '화이트', scheme: 'light', swatch: '#fff',
-        background: '#f2f2f2', text: '#28292c', muted: '#656970', scene: '#ffffff', thought: '#eeeeee',
+        background: '#f2f2f2', text: '#28292c', muted: '#656970', scene: '#ffffff', thought: '#ddd',
         gaugeText: '#384451', gaugeAccent: '#657589', gaugeTrack: '#e5e7e9',
     },
     dark: {
