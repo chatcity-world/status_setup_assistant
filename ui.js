@@ -73,7 +73,7 @@ const HTML_OPTIONS = `
         </div>
         <form id="rp-status-theme-builder" data-builder hidden>
             <label for="rp-theme-request">원하는 테마</label>
-            <textarea id="rp-theme-request" class="text_pole" rows="3" placeholder="예: 별이 빛나는 밤하늘, 남색 배경과 은색 글자" required></textarea>
+            <textarea id="rp-theme-request" class="text_pole" rows="3" placeholder="예: 다크 테마, 폰트 크기 10 - 12px, 변수 항목당 1줄씩 사용, 속마음은 가운데 정렬 등등" required></textarea>
             <p class="rp-status-hint">저장한 항목의 변수를 넣어 만듭니다. 현재 연결된 AI를 사용하며 API 사용량이 발생할 수 있습니다.</p>
             <button type="submit" class="menu_button">테마 생성</button>
             <p class="rp-status-result rp-status-theme-result" role="status" data-theme-result></p>
