@@ -196,7 +196,7 @@ function showThemeVariables(list, fields) {
 
 const SAMPLE_VALUES = {
     날짜: '2026년 11월 13일', 시간: '19:30', 날씨: '☀️ 맑음', 기온: '12°C',
-    장소: '타로점', 옷차림: '검은 재킷', 호감도: 65, 속마음: '조금 더 같이 있고 싶다.',
+    장소: '편의점 앞', 옷차림: '검은 재킷에 청바지', 호감도: 65, 속마음: '아 집가고 싶다.',
 };
 
 async function copyText(textarea) {
