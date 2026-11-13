@@ -236,19 +236,25 @@ export function createCardRenderer() {
             // Fit the outer theme to the host column, including older fixed-width themes.
             for (const [property, value] of outerStyles) element.style.setProperty(property, value, 'important');
         }
-        const themeStyle = baseCSS + '\n' + (css || '') + '\n' + embeddedCSS;
-        if (sheet) {
-            if (currentCSS !== themeStyle) {
-                sheet.replaceSync(themeStyle);
-                currentCSS = themeStyle;
-            }
-            if (root.adoptedStyleSheets[0] !== sheet) root.adoptedStyleSheets = [sheet];
-            root.replaceChildren(fragment);
-        } else {
-            const style = document.createElement('style');
-            style.textContent = themeStyle;
-            root.replaceChildren(style, fragment);
-        }
-        painted.set(host, { fields, signature, html, css });
+        const themeStyle = `${baseCSS}
+:where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    background: transparent;
+}
+:where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge::-webkit-progress-bar {
+    background: transparent;
+}
+:where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge::-webkit-progress-value {
+    background: var(--rp-gauge-accent, currentColor);
+    border-radius: 999px;
+}
+:where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge::-moz-progress-bar {
+    background: var(--rp-gauge-accent, currentColor);
+    border-radius: 999px;
+}
+${css || ''}
+${embeddedCSS}`;
     };
 }
