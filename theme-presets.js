@@ -12,16 +12,18 @@ const DEFAULT_ORDER = ['날짜', '시간', '날씨', '기온', '장소', '옷차
 const HEX_COLOR = /^#[\da-f]{6}$/i;
 const GROUP_ID = /^[1-9]\d*$/;
 const SLACK_LAYOUT_VERSION = 2;
-const WIDGET_LAYOUT_VERSION = 2;
+const WIDGET_LAYOUT_VERSION = 3;
 const WIDGET_WEATHER_GROUP = '2';
 const DATE_TIME = ['날짜', '시간'];
+const WEATHER_READINGS = ['날씨', '기온'];
 
-function defaultItems(fields) {
+function defaultItems(fields, palette) {
     const byKey = indexFields(fields);
-    const standard = [...DEFAULT_ORDER, '호감도', '속마음'].map(key => byKey.get(key)).filter(Boolean);
+    const order = palette?.widget ? ['날짜', '시간', '날씨', '기온', '옷차림', '장소'] : DEFAULT_ORDER;
+    const standard = [...order, '호감도', '속마음'].map(key => byKey.get(key)).filter(Boolean);
     const extra = fields.filter(field => !standard.includes(field));
     return [
-        ...DEFAULT_ORDER.map(key => byKey.get(key)).filter(Boolean),
+        ...order.map(key => byKey.get(key)).filter(Boolean),
         ...extra.filter(field => field.type !== 'gauge'),
         byKey.get('호감도'),
         ...extra.filter(field => field.type === 'gauge'),
@@ -33,8 +35,7 @@ function defaultGroup(field, byKey, palette) {
     if (field === byKey.get('날짜') || field === byKey.get('시간')) return palette?.widget ? WIDGET_WEATHER_GROUP : '1';
     if (field === byKey.get('날씨') || field === byKey.get('기온')) return '2';
     if (field === byKey.get('속마음') || field === byKey.get('호감도')) return '';
-    if (field === byKey.get('장소')) return palette?.widget ? WIDGET_WEATHER_GROUP : palette?.slack ? '' : '3';
-    if (field === byKey.get('옷차림')) return palette?.slack ? '' : '3';
+    if (field === byKey.get('장소') || field === byKey.get('옷차림')) return palette?.slack ? '' : '3';
     return field.type === 'gauge' ? '' : '3';
 }
 
@@ -52,13 +53,14 @@ export function normalizeThemeLayout(fields, saved, palette) {
     const slack = Boolean(palette?.slack);
     const widget = Boolean(palette?.widget);
     const migrateSlack = slack && (saved?.version ?? 1) < SLACK_LAYOUT_VERSION;
-    const migrateWidget = widget && (saved?.version ?? 1) < WIDGET_LAYOUT_VERSION;
-    const available = new Map(defaultItems(fields).map(field => [field.key, field]));
+    const layoutVersion = saved?.version ?? 1;
+    const migrateWidgetPlace = widget && layoutVersion < WIDGET_LAYOUT_VERSION;
+    const available = new Map(defaultItems(fields, palette).map(field => [field.key, field]));
     const groups = new Set([...THEME_GROUPS, ...Object.keys(saved?.groups ?? {}).filter(id => GROUP_ID.test(id))]);
     const items = [];
     const savedByKey = new Map((Array.isArray(saved?.items) ? saved.items : []).filter(item => item?.key).map(item => [item.key, item]));
     // Move the former date group into the weather panel when it has no custom styling or members.
-    const mergeWidgetDates = migrateWidget && !Object.keys(colorSettings(saved?.groups?.['1'])).length
+    const mergeWidgetDates = widget && layoutVersion < 2 && !Object.keys(colorSettings(saved?.groups?.['1'])).length
         && [...savedByKey.values()].every(item => item.group !== '1' || DATE_TIME.includes(item.key));
     function add(field, existing) {
         const defaultId = defaultGroup(field, byKey, palette);
@@ -66,12 +68,11 @@ export function normalizeThemeLayout(fields, saved, palette) {
         const isOldSlackSceneItem = migrateSlack && existing?.group === '3'
             && (field === byKey.get('장소') || field === byKey.get('옷차림'));
         const isOldWidgetDateItem = mergeWidgetDates && existing?.group === '1' && DATE_TIME.includes(field.key);
-        const group = !isOldSlackSceneItem && !isOldWidgetDateItem && typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
+        const isOldWidgetPlace = migrateWidgetPlace && field === byKey.get('장소') && existing?.group === WIDGET_WEATHER_GROUP;
+        const group = !isOldSlackSceneItem && !isOldWidgetDateItem && !isOldWidgetPlace && typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
             ? existing.group : defaultId;
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
-        const widgetPlace = widget && field === byKey.get('장소');
-        const useDefaultLabel = migrateWidget && widgetPlace && existing?.group === WIDGET_WEATHER_GROUP;
-        const label = !useDefaultLabel && typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key) && !widgetPlace;
+        const label = !isOldWidgetPlace && typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
         const gaugeColor = existing?.gaugeColor;
         if (group) groups.add(group);
         items.push({
@@ -90,6 +91,15 @@ export function normalizeThemeLayout(fields, saved, palette) {
         const index = group ? items.findLastIndex(item => item.group === group) : -1;
         add(field);
         if (index >= 0) items.splice(index + 1, 0, items.pop());
+    }
+    const savedPlace = savedByKey.get('장소');
+    if (widget && (!savedPlace || (migrateWidgetPlace && savedPlace.group === WIDGET_WEATHER_GROUP))) {
+        const place = items.findIndex(item => item.key === '장소');
+        const clothes = items.find(item => item.key === '옷차림' && item.group === '3');
+        if (place >= 0 && clothes) {
+            const [location] = items.splice(place, 1);
+            items.splice(items.indexOf(clothes) + 1, 0, location);
+        }
     }
     const orderedGroups = [...groups].sort((left, right) => left.length - right.length || left.localeCompare(right));
     return {
@@ -292,13 +302,16 @@ function renderWidgetWeather(palette, members, byKey, layout) {
         ['장소', `color:${colors.customText ? colors.text : '#fff'};`],
     ]);
     const placeMargin = members.at(-1).key === '장소' ? 'margin-top:auto;' : '';
-    const rowStyles = new Map([
-        ['기온', 'display:grid;flex:1 0 auto;align-content:center;'],
-        ['장소', `align-self:flex-start;${placeMargin}padding:var(--rp-widget-place-padding,4px 9px);border-radius:14px;background:rgb(255 255 255 / 20%);`],
-    ]);
+    const placeStyle = `align-self:flex-start;${placeMargin}padding:var(--rp-widget-place-padding,4px 9px);border-radius:14px;background:rgb(255 255 255 / 20%);`;
     const rows = members.map(item => renderPresetField(palette, byKey.get(item.key), item, {
-        groupColors: colors, compact: true, rowStyle: rowStyles.get(item.key), valueStyle: valueStyles.get(item.key),
+        groupColors: colors, compact: true, rowStyle: item.key === '장소' ? placeStyle : '', valueStyle: valueStyles.get(item.key),
     }));
+    const readingIndex = members.findIndex(item => WEATHER_READINGS.includes(item.key));
+    if (readingIndex >= 0) {
+        const last = WEATHER_READINGS.includes(members[readingIndex + 1]?.key) ? readingIndex + 1 : readingIndex;
+        rows[readingIndex] = `<div data-rp-status-group style="display:grid;gap:inherit;margin-top:auto">${rows[readingIndex]}`;
+        rows[last] += '</div>';
+    }
     const dateIndex = members.findIndex(item => DATE_TIME.includes(item.key));
     if (dateIndex >= 0 && DATE_TIME.includes(members[dateIndex + 1]?.key)) {
         const dates = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;gap:0 8px">${rows.slice(dateIndex, dateIndex + 2).join('')}</div>`;
@@ -307,23 +320,24 @@ function renderWidgetWeather(palette, members, byKey, layout) {
     const weather = palette.widget.weather;
     const background = layout.groups[id]?.background ?? weather.background;
     const edge = background === 'transparent' ? '' : `${weather.edge}box-shadow:${weather.shadow};`;
-    return `<div class="rp-widget-weather" data-rp-status-group style="box-sizing:border-box;display:flex;flex-direction:column;align-self:start;gap:var(--rp-widget-weather-gap,clamp(4px,1.2cqi,8px));width:var(--rp-widget-weather-width,100%);max-width:240px;min-width:0;min-height:0;aspect-ratio:1 / 1;overflow:auto;padding:var(--rp-widget-weather-padding,clamp(9px,2.8cqi,19px));border-radius:clamp(16px,4.1cqi,31px);line-height:1.36;background:${background};color:${colors.text};${edge}">
+    return `<div class="rp-widget-weather" data-rp-status-group style="box-sizing:border-box;display:flex;flex-direction:column;align-self:start;gap:var(--rp-widget-weather-gap,clamp(4px,1.2cqi,8px));width:var(--rp-widget-weather-width,100%);max-width:240px;min-width:0;min-height:0;aspect-ratio:1 / 1;overflow:auto;padding:var(--rp-widget-weather-padding,clamp(9px,2.8cqi,19px));padding-bottom:clamp(24px,5.4cqi,44px);border-radius:clamp(16px,4.1cqi,31px);line-height:1.36;background:${background};color:${colors.text};${edge}">
     ${rows.join('\n    ')}
   </div>`;
 }
 
 function renderWidget(blocks, byKey) {
     const spacing = 'clamp(10px,3.1cqi,24px)';
-    const weatherIndex = blocks[0]?.group === '1' ? 1 : 0;
-    const weather = blocks[weatherIndex];
+    const affinityKey = byKey.has('호감도') ? '호감도' : '애정';
+    const bottom = [affinityKey, '속마음'].map(key => blocks.find(block => !block.group && block.members[0].key === key)).filter(Boolean);
+    const main = blocks.filter(block => !bottom.includes(block));
+    const weatherIndex = main[0]?.group === '1' ? 1 : 0;
+    const weather = main[weatherIndex];
     if (weather?.group !== WIDGET_WEATHER_GROUP) {
         return `<div style="display:grid;gap:${spacing};min-width:0;padding:${spacing}">
-    ${blocks.map(block => block.html).join('\n    ')}
+    ${[...main, ...bottom].map(block => block.html).join('\n    ')}
   </div>`;
     }
-    const last = blocks.at(-1);
-    const thought = last.group === '' && last.members[0].key === '속마음' ? last : undefined;
-    const right = blocks.filter((block, index) => index !== weatherIndex && block !== thought);
+    const right = main.filter(block => block !== weather);
     const gap = 'clamp(7px,2.3cqi,15px)';
     const footerIndex = right.findIndex(block => block.members.some(item => item.key === '속마음' || byKey.get(item.key).type === 'gauge'));
     const details = right.slice(0, footerIndex < 0 ? right.length : footerIndex);
@@ -338,7 +352,7 @@ function renderWidget(blocks, byKey) {
         </div>
       </div>
     </div>
-    ${thought?.html ?? ''}
+    ${bottom.map(block => block.html).join('\n    ')}
   </div>`;
 }
 
