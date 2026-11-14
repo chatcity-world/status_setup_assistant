@@ -145,7 +145,7 @@ function addFieldRow(container, field = { label: '', type: 'text', enabled: true
         </div>
         <label>표시 이름<input class="text_pole" data-field="label" maxlength="48" required autocomplete="off"></label>
         <label>형식<select class="text_pole" data-field="type"><option value="text">텍스트</option><option value="gauge">게이지</option></select></label>
-        <label class="rp-status-field-rule">AI 작성 규칙 (선택)<textarea class="text_pole" data-field="rule" rows="2" placeholder="AI에게 전달할 해당 변수에 대한 짧은 설명"></textarea></label>`;
+        <label class="rp-status-field-rule">AI 작성 규칙<textarea class="text_pole" data-field="rule" rows="2" placeholder="AI에게 전달할 해당 변수에 대한 짧은 설명"></textarea></label>`;
     for (const input of row.querySelectorAll('[data-field]')) {
         const value = field[input.dataset.field];
         if (input.type === 'checkbox') input.checked = value;
@@ -193,11 +193,6 @@ function showThemeVariables(list, fields) {
         return [name, value];
     }));
 }
-
-const SAMPLE_VALUES = {
-    날짜: '2026년 11월 13일', 시간: '19:30', 날씨: '☀️ 맑음', 기온: '12°C',
-    장소: '편의점 앞', 옷차림: '검은 재킷에 청바지', 호감도: 65, 속마음: '아 집가고 싶다.',
-};
 
 async function copyText(textarea) {
     try {
@@ -307,7 +302,6 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     const expandCode = root.querySelector('[data-action="expand-code"]');
     const themePanel = root.querySelector('#rp-status-panel-html');
     const previewCard = root.querySelector('[data-preview-card]');
-    const previewLabel = root.querySelector('[data-preview-label]');
     const result = root.querySelector('[data-editor-result]');
     const fields = root.querySelector('[data-field-list]');
     const variables = root.querySelector('[data-theme-variables]');
@@ -325,7 +319,6 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     let deleteAvatar;
     let characterList = '';
     let themeGeneration;
-    let previewValues = {};
     let previewFrame = 0;
     let draftPreset;
     let draftLayouts = {};
@@ -336,19 +329,8 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
         previewFrame = requestAnimationFrame(() => {
             previewFrame = 0;
             if (!settings || themePanel.hidden || !icon.classList.contains('up')) return;
-            const enabled = settings.fields.filter(field => field.enabled);
-            const hasValues = enabled.some(field => Object.hasOwn(previewValues, field.key));
-            const sample = Object.fromEntries(enabled.map(field => {
-                const fallback = field.type === 'gauge' ? 50 : '예시';
-                const sampleKey = field.variable ?? field.key;
-                return [field.key, Object.hasOwn(SAMPLE_VALUES, sampleKey) ? SAMPLE_VALUES[sampleKey] : fallback];
-            }));
-            const previewingPreset = Boolean(draftPreset);
-            const values = !hasValues || previewingPreset ? { ...sample, ...previewValues } : previewValues;
-            const hasSample = (!hasValues || previewingPreset) && enabled.some(field => !Object.hasOwn(previewValues, field.key));
-            previewLabel.textContent = hasSample ? '미리보기 · 내용은 예시' : '미리보기';
             applyCardTypography(previewCard, getPreviewTypography?.());
-            renderCard(previewCard, settings.fields, values, html.value || DEFAULT_HTML, '');
+            renderCard(previewCard, settings.fields, {}, html.value || DEFAULT_HTML, '');
         });
     }
 
@@ -493,7 +475,6 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             syncThemeBuilder();
             showResult('');
         }
-        previewValues = !characterScope || avatar === state.activeAvatar ? state.values : {};
         paintPreview();
     }
 

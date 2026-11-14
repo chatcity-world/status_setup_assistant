@@ -33,6 +33,33 @@ const SLACK = {
     labelColumn: '44px',
 };
 
+const WIDGET_WEATHER = {
+    surface: '#090b10',
+    background: 'radial-gradient(ellipse 86% 31% at 51% 106%,#c5edff8c,#77aaff30 53%,transparent 100%),'
+        + 'linear-gradient(180deg,#090b10 0%,#0a0f19 54%,#10234a 73%,#234cba 88%,#5a8df8 96%,#8ecbff 100%)',
+    edge: 'border:1px solid #92b7ef3b;border-bottom-color:#b9e6ffc4;',
+    shadow: 'inset 0 2px 6px #a6caff19,inset 4px 0 12px #7ca9ff29,inset -4px 0 12px #7ca9ff29,inset 0 -2px 8px #baedff70',
+};
+
+const WIDGET_CSS = `:host { container-type: inline-size; }
+
+.rp-widget-details:only-child { grid-column: 1 / -1; }
+.rp-status-widget .rp-gauge::-webkit-progress-value { border-radius: 0; }
+.rp-status-widget .rp-gauge::-moz-progress-bar { border-radius: 0; }
+
+@container (max-width: 470px) {
+    .rp-widget-weather {
+        --rp-widget-weather-gap: 3px;
+        --rp-widget-weather-padding: 7px 9px;
+        --rp-widget-place-padding: 2px 6px;
+    }
+}
+
+@container (max-width: 320px) {
+    .rp-widget-columns { --rp-widget-columns: minmax(0, 1fr); }
+    .rp-widget-weather { --rp-widget-weather-width: min(100%, 180px); justify-self: center; }
+}`;
+
 export const THEME_PRESETS = {
     white: {
         id: 'white', label: '화이트', scheme: 'light', swatch: '#fff',
@@ -136,6 +163,26 @@ export const THEME_PRESETS = {
             gaugeTrack: '--rp-gauge-height:3px;height:var(--rp-gauge-height);border-radius:2px;overflow:visible;',
             gaugeValue: 'font-size:11px;',
             gaugeGlow: '0 0 6px #508fff65',
+        },
+    },
+    'iphone-widget': {
+        id: 'iphone-widget', label: '위젯', scheme: 'dark', swatch: WIDGET_WEATHER.background,
+        background: '#050e08', text: '#f6f8f6', muted: '#b9c1bb', headerMuted: '#bdc3c0', scene: 'transparent',
+        thought: '#17211b', gaugeBackground: '#202a24', gaugeText: '#f6f8f6', gaugeAccent: '#fafcfb',
+        gaugeTrack: 'repeating-linear-gradient(90deg,#818b83 0 1px,transparent 1px 4px) center/100% 65% no-repeat',
+        widget: { weather: WIDGET_WEATHER, css: WIDGET_CSS },
+        skin: {
+            card: 'container-type:inline-size;padding:0;gap:0;border-radius:clamp(20px,4.6cqi,36px);word-break:keep-all;',
+            typography: 'font-family:var(--rp-status-font-family,var(--mainFontFamily,-apple-system,system-ui,sans-serif));font-size:12px;line-height:1.45;',
+            labelColumn: '3em',
+            labelGap: 7,
+            scene: 'align-content:start;padding:0;',
+            thought: 'display:grid;gap:3px;padding:clamp(7px,1.7cqi,11px) clamp(9px,2.1cqi,15px);border-radius:clamp(10px,2cqi,16px);',
+            stackedValueMargin: '0 auto',
+            gauge: 'grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:9px;'
+                + 'padding:clamp(7px,1.7cqi,11px) clamp(9px,2.1cqi,15px);border-radius:clamp(10px,2cqi,16px);',
+            gaugeTrack: '--rp-gauge-height:clamp(5px,1.4cqi,10px);height:var(--rp-gauge-height);',
+            gaugeValue: 'font-weight:550;',
         },
     },
 };

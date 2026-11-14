@@ -3,7 +3,7 @@ export const AI_KEY = 'gamja_rp_status_ai';
 const LEGACY_MANUAL_KEY = 'gamja_rp_status_manual';
 
 export const DEFAULT_FIELDS = [
-    ['날짜', '현재 롤플레잉 날짜를 YYYY년 MM월 DD일로 표시'],
+    ['날짜', '현재 롤플레잉 날짜를 YYYY.MM.DD (Mon) 형식으로 표시'],
     ['시간', '현재 롤플레잉 시간을 HH:MM으로 표시'],
     ['날씨', '현재 롤플레잉의 날씨를 짧은 단어로 표시하고, 이모지 1개 노출 (예: ☀️ 맑음)'],
     ['기온', '현재 롤플레잉의 기온을 섭씨(°C)로 표기'],

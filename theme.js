@@ -100,9 +100,10 @@ export function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ESCAPES[char]);
 }
 
-function gauge(label, value, compact = false) {
+function gauge(label, value, { compact = false, preview = false } = {}) {
     const layout = compact ? 'display:inline-block;width:40px;max-width:100%;vertical-align:middle' : 'width:100%';
-    return `<progress class="rp-gauge" style="${layout};min-width:0;height:var(--rp-gauge-height,6px);accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
+    const fallback = preview ? '' : `${value}%`;
+    return `<progress class="rp-gauge" style="${layout};min-width:0;height:var(--rp-gauge-height,6px);accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${fallback}</progress>`;
 }
 
 export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '') {
@@ -114,6 +115,7 @@ export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '') {
 
 const DISPLAY_PREFIX = '표시:';
 const GAUGE_SUFFIX = '_게이지';
+const PREVIEW_GAUGE_FILL = 50;
 
 export function themeVariableNames(field) {
     const name = field.variable ?? field.key;
@@ -135,20 +137,22 @@ export function resolveThemeField(token, byKey, includeHidden = false) {
     return { field, format };
 }
 
-function formatValue(field, value, compact = false) {
-    if (value == null) return '—';
-    if (field.type !== 'gauge') return escapeHtml(value);
-    const percent = normalizeValue(field, value);
+function formatValue(field, value, { compact = false, preview = false } = {}) {
+    if (!preview && value == null) return '—';
+    const label = field.label || field.key;
+    if (field.type !== 'gauge') return escapeHtml(preview ? label : value);
+    const percent = preview ? PREVIEW_GAUGE_FILL : normalizeValue(field, value);
     if (percent == null) return '—';
-    const bar = gauge(field.label, percent, compact);
-    if (compact) return `${percent}% ${bar}`;
-    return gaugeDisplay(bar, `${percent}%`);
+    const bar = gauge(label, percent, { compact, preview });
+    const detail = preview ? escapeHtml(label) : `${percent}%`;
+    if (compact) return `${detail} ${bar}`;
+    return gaugeDisplay(bar, detail);
 }
 
-function htmlFor(template, fields, values, inheritFont) {
-    const filled = fields.filter(field => field.enabled && Object.hasOwn(values, field.key));
+function htmlFor(template, fields, values, inheritFont, preview) {
+    const filled = fields.filter(field => field.enabled && (preview || Object.hasOwn(values, field.key)));
     const rows = filled.map(field => {
-        const detail = formatValue(field, values[field.key], true);
+        const detail = formatValue(field, values[field.key], { compact: true, preview });
         return `<div class="rp-field" style="display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%">
             <dt class="rp-label" style="flex:none;max-width:45%;${inheritFont ? '' : 'font-size:.85em;'}opacity:.75;overflow-wrap:anywhere">${escapeHtml(field.label)}</dt>
             <dd class="rp-value" style="min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd>
@@ -160,7 +164,7 @@ function htmlFor(template, fields, values, inheritFont) {
     for (const row of source.content.querySelectorAll('[data-rp-status-field]')) {
         const key = row.dataset.rpStatusField;
         const field = variables.get(key);
-        const missingValue = row.hasAttribute('data-rp-status-hide-empty')
+        const missingValue = !preview && row.hasAttribute('data-rp-status-hide-empty')
             && (!Object.hasOwn(values, key) || values[key] == null || values[key] === '');
         if (!field?.enabled || field.key !== key || missingValue) row.remove();
     }
@@ -184,10 +188,11 @@ function htmlFor(template, fields, values, inheritFont) {
         const { field, format } = resolved;
         const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined;
         if (format === 'gauge') {
-            const percent = normalizeValue(field, value);
-            return percent == null ? '' : gauge(field.label, percent);
+            const percent = preview ? PREVIEW_GAUGE_FILL : normalizeValue(field, value);
+            return percent == null ? '' : gauge(field.label || field.key, percent, { preview });
         }
-        if (format === 'display') return formatValue(field, value);
+        if (format === 'display') return formatValue(field, value, { preview });
+        if (preview) return escapeHtml(field.label || field.key);
         return value == null ? '—' : escapeHtml(String(value) + percent);
     }
     for (const node of nodes) {
@@ -212,7 +217,7 @@ export function applyCardTypography(host, { fontFamily, fontSize, fontWeight, fo
     }
 }
 
-export function createCardRenderer() {
+export function createCardRenderer({ preview = false } = {}) {
     const painted = new WeakMap();
     const canShareCSS = typeof CSSStyleSheet === 'function'
         && 'adoptedStyleSheets' in ShadowRoot.prototype && 'replaceSync' in CSSStyleSheet.prototype;
@@ -244,7 +249,7 @@ export function createCardRenderer() {
         for (const title of [outer, outer?.firstElementChild, ...headings]) {
             if (title?.textContent.trim() === '상태창') title.remove();
         }
-        const fragment = SillyTavern.libs.DOMPurify.sanitize(htmlFor(wrapper.innerHTML, fields, values, inheritFont), {
+        const fragment = SillyTavern.libs.DOMPurify.sanitize(htmlFor(wrapper.innerHTML, fields, values, inheritFont, preview), {
             ALLOWED_TAGS: HTML_TAGS,
             ALLOWED_ATTR: HTML_ATTRIBUTES,
             ALLOW_DATA_ATTR: false,

@@ -144,7 +144,7 @@ function render() {
     const chatKey = getChatKey(context);
     const settings = settingsFor(context);
     const enabled = Boolean(chatKey && settings.enabled);
-    const model = enabled ? getTimeline(context, settings) : { cards: new Map(), values: {} };
+    const cards = enabled ? getTimeline(context, settings).cards : new Map();
     const wasAtBottom = chatRoot && chatRoot.scrollHeight - chatRoot.scrollTop - chatRoot.clientHeight < 45;
     const shouldFollow = wasAtBottom && !lockedScroll;
     lockedScroll = false;
@@ -154,7 +154,7 @@ function render() {
         if (!message.matches('.mes[mesid]')) continue;
         const body = message.querySelector('.mes_text');
         const existing = [...message.querySelectorAll('.rp-status-message')];
-        const row = model.cards.get(Number(message.getAttribute('mesid')));
+        const row = cards.get(Number(message.getAttribute('mesid')));
         const shouldShow = enabled && row && (settings.mode === 'each' || row.changed);
         if (!body || !shouldShow) {
             existing.forEach(card => card.remove());
@@ -181,7 +181,7 @@ function render() {
     }
     alignMessageCards();
 
-    updateSettingsPanel?.({ shared: sharedSettings, activeAvatar: currentAvatar(context), values: model.values });
+    updateSettingsPanel?.({ shared: sharedSettings, activeAvatar: currentAvatar(context) });
     if (shouldFollow) chatRoot.scrollTop = chatRoot.scrollHeight;
 }
 
@@ -323,7 +323,7 @@ function initialize() {
             update: updateSettings,
             saveCurrent: saveCurrentCharacter,
             removeProfile: removeCharacterProfile,
-            renderCard: createCardRenderer(),
+            renderCard: createCardRenderer({ preview: true }),
             getPreviewTypography: previewTypography,
         });
     }

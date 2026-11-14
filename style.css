@@ -671,7 +671,7 @@
 
 .rp-status-settings .rp-status-code-heading > .menu_button { margin-inline-start: auto; }
 .rp-status-settings .rp-status-code-expand { min-width: 28px; padding: 3px 5px; }
-.rp-status-code-actions { margin: 0; }
+.rp-status-code-actions { justify-content: center; margin: 0; }
 
 .rp-status-settings .rp-status-code-dialog {
     position: fixed;
