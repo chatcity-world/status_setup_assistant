@@ -1,9 +1,10 @@
 const LCD = {
-    card: 'padding:6px;border-radius:4px;gap:5px;',
+    card: 'padding:6px;border-radius:12px;gap:5px;',
     header: 'gap:2px;',
-    headerGroup: 'flex:1 1 116px;padding:6px 9px;border-radius:0;',
-    scene: 'padding:8px 9px;border-radius:0;gap:4px;',
-    item: 'border-radius:0;',
+    headerGroup: 'flex:1 1 116px;padding:6px 9px;border-radius:7px;',
+    weatherGroup: 'justify-content:flex-end;',
+    scene: 'padding:8px 9px;border-radius:8px;gap:4px;',
+    item: 'border-radius:8px;',
     thought: 'padding:8px 10px 9px;',
     gauge: 'padding:7px 9px;',
     labelColumn: '42px',
@@ -11,7 +12,7 @@ const LCD = {
 };
 
 function lcdFooter(background, grid, ink) {
-    return `<div aria-hidden="true" style="display:grid;place-items:center;min-height:56px;color:${ink};background-color:${background};background-image:linear-gradient(to right,${grid} 1px,transparent 1px),linear-gradient(to bottom,${grid} 1px,transparent 1px);background-size:4px 4px;background-position:center">
+    return `<div aria-hidden="true" style="display:grid;place-items:center;min-height:56px;border-radius:8px;color:${ink};background-color:${background};background-image:linear-gradient(to right,${grid} 1px,transparent 1px),linear-gradient(to bottom,${grid} 1px,transparent 1px);background-size:4px 4px;background-position:center">
     <span style="display:block;width:44px;height:40px">
       <span style="display:block;width:3px;height:3px;margin:1px;box-shadow:
         12px 0,16px 0,20px 0,24px 0,28px 0,8px 4px,32px 4px,4px 8px,36px 8px,
@@ -59,14 +60,14 @@ export const THEME_PRESETS = {
     },
     tamagotchi: {
         id: 'tamagotchi', label: '다마고치', scheme: 'light', swatch: '#a4a995',
-        background: '#a4a995', text: '#20241a', muted: '#20241a', headerBackground: '#bec3b0',
+        background: '#a4a995', text: '#20241a', muted: '#2a3325', headerMuted: '#20241a', headerBackground: '#bec3b0',
         scene: '#b3b9a5', thought: '#c0c5b2',
         gaugeBackground: '#939b84', gaugeText: '#20241a', gaugeAccent: '#20241a', gaugeTrack: '#757e68',
         skin: { ...LCD, footer: lcdFooter('#989f89', '#dce1d057', '#20241a') },
     },
     'pink-tamagotchi': {
         id: 'pink-tamagotchi', label: '핑크 다마고치', scheme: 'light', swatch: '#c8b2bc',
-        background: '#c8b2bc', text: '#392e34', muted: '#392e34', headerBackground: '#e1cdd4',
+        background: '#c8b2bc', text: '#392e34', muted: '#643954', headerMuted: '#392e34', headerBackground: '#e1cdd4',
         scene: '#e4d4da', thought: '#eadce1',
         gaugeBackground: '#cfb6c0', gaugeText: '#392e34', gaugeAccent: '#624657', gaugeTrack: '#b69eab',
         skin: { ...LCD, footer: lcdFooter('#c4abb6', '#eadce168', '#624657') },
@@ -80,6 +81,7 @@ export const THEME_PRESETS = {
             card: 'gap:1px;padding:0;border:1px solid #5d806b;border-radius:12px;overflow:hidden;',
             header: 'gap:1px;background:#78a78c;',
             headerGroup: 'flex:1 1 114px;padding:7px 9px;border-radius:0;',
+            weatherGroup: 'justify-content:flex-end;',
             scene: 'padding:0;gap:1px;border-radius:0;',
             item: 'border-radius:0;',
             thought: 'padding:9px 12px 10px;',
@@ -103,6 +105,38 @@ export const THEME_PRESETS = {
         gaugeBackground: '#233540', gaugeText: '#b9dcf4', gaugeAccent: '#79b7e2', gaugeTrack: '#425866',
         skin: { ...SLACK, card: SLACK.card + 'border:1px solid #534658;' },
         slack: { rail: '#27182c', logo: '#402b46', channel: '#553b5c', header: '#22252a', divider: '#3b3c43' },
+    },
+    neon: {
+        id: 'neon', label: '네온', scheme: 'dark', swatch: 'radial-gradient(ellipse at 75% 100%,#a4dbff,#225bd5 35%,#0b1935 78%)',
+        background: '#0b1935', text: '#ecf4ff', muted: '#a0b7da', headerMuted: '#aedbff',
+        cardBackground: [
+            'linear-gradient(90deg,transparent 6%,#639bff50 40%,#cff0ffd9 77%,transparent) bottom/100% 1px no-repeat',
+            'radial-gradient(ellipse 79% 23px at 76% 100%,#a4dbffd9,#478dffc4 22%,#235af38a 46%,#184bd732 70%,transparent)',
+            'radial-gradient(ellipse 22px 78% at 100% 83%,#62aaff91,#2866f24d 40%,transparent)',
+            'radial-gradient(ellipse 46% 19px at 16% 0%,#559eff78,#215eea42 42%,transparent)',
+            'radial-gradient(ellipse 16px 58% at 0 16%,#436df65c,transparent)',
+            'linear-gradient(135deg,#0b1935f5,#040a19f7 58%,#08152ff2)',
+        ].join(','),
+        headerBackground: '#10203e', headerGroupBackground: 'linear-gradient(120deg,#6ba5ff15,#6ba5ff07)',
+        scene: '#03091a', sceneBackground: '#03091a52', locationText: '#cce7ff', thought: 'transparent',
+        gaugeText: '#aedbff', gaugeAccent: '#70b6ff', gaugeTrack: '#8cbaff29',
+        gaugeFill: 'linear-gradient(90deg,#3669d8,#70b6ff 85%,#caf0ff)',
+        skin: {
+            card: 'padding:11px 12px 14px;gap:7px;border-radius:16px;overflow:hidden;word-break:keep-all;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:inset 0 0 0 1px #5e91ef42,inset 0 0 14px #2865ee29;',
+            typography: 'font-family:var(--rp-status-font-family,var(--mainFontFamily,system-ui,sans-serif));font-size:12px;line-height:1.45;',
+            header: 'display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:6px;',
+            headerGroup: 'justify-content:space-between;gap:2px 8px;padding:4px 8px;border-radius:7px;box-shadow:inset 0 1px 0 #b1d3ff15;font-size:11px;font-variant-numeric:tabular-nums;',
+            scene: 'padding:3px 8px;gap:0;border-radius:7px;',
+            groupRow: 'padding-block:2px;',
+            label: 'font-size:10px;',
+            labelColumn: '36px',
+            thought: 'display:grid;justify-items:center;gap:2px;padding:6px 8px 0;border-radius:0;border-top:1px solid #a5c7ff1a;font-size:11px;',
+            stackedValueMargin: '0 auto',
+            gauge: 'align-items:center;padding:0 8px;',
+            gaugeTrack: '--rp-gauge-height:3px;height:var(--rp-gauge-height);border-radius:2px;overflow:visible;',
+            gaugeValue: 'font-size:11px;',
+            gaugeGlow: '0 0 6px #508fff65',
+        },
     },
 };
 

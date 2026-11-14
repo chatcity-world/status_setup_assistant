@@ -183,7 +183,7 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const [valueName, barName] = themeVariableNames(field).map(escapeHtml);
     let value = `{{${valueName}}}`;
     if (barName) {
-        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack);
+        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.gaugeValue);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
     const centeredLabel = item.align !== 'left' || field.key === '속마음';
@@ -198,22 +198,26 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const labelTone = compact ? palette.headerMuted ?? palette.muted : palette.muted;
     const color = customText || channel ? 'inherit' : labelTone;
     const labelName = escapeHtml(field.label || field.key);
-    const labelStyle = `color:${color};${cell ? 'padding:6px 9px;' : ''}`;
+    const labelStyle = `color:${color};${skin.label ?? ''}${cell ? 'padding:6px 9px;' : ''}`;
     const label = !item.label ? '' : channel
         ? `<dt style="${labelStyle}"><span aria-hidden="true"># </span><span data-rp-status-field-label>${labelName}</span></dt>`
         : `<dt data-rp-status-field-label style="${labelStyle}">${labelName}</dt>`;
-    const gauge = barName ? `--rp-gauge-accent:${itemColors.gaugeColor};--rp-gauge-track:${palette.gaugeTrack};` : '';
+    const gaugeFill = palette.gaugeFill && !item.gaugeColor ? `--rp-gauge-fill:${palette.gaugeFill};` : '';
+    const gaugeGlow = skin.gaugeGlow ? `--rp-gauge-glow:${skin.gaugeGlow};` : '';
+    const gauge = barName ? `--rp-gauge-accent:${itemColors.gaugeColor};--rp-gauge-track:${palette.gaugeTrack};${gaugeFill}${gaugeGlow}` : '';
     const width = !item.group && field.key === '속마음' ? 'max-width:60ch;' : '';
-    const margin = !inlineLabel ? (item.label ? '4px auto 0' : '0 auto') : '0';
+    const margin = !inlineLabel ? (item.label ? skin.stackedValueMargin ?? '4px auto 0' : '0 auto') : '0';
     const numeric = compact && ['시간', '기온'].includes(field.key);
-    const muted = numeric && !customText ? `color:${palette.headerMuted ?? palette.muted};` : '';
+    const valueColor = numeric ? palette.headerMuted ?? palette.muted : field.key === '장소' ? palette.locationText : undefined;
+    const valueTone = valueColor && !customText ? `color:${valueColor};` : '';
     const flex = distributes || (compact && barName) ? 'flex:1 1 6rem;' : '';
     const channelStyle = channel ? 'flex:1 1 148px;' : '';
     const cellStyle = cell ? `background:${background};` : '';
     const cellValue = cell ? `padding:6px 9px;${item.label && inlineLabel ? `border-inline-start:1px solid ${skin.cellLine};` : ''}` : '';
-    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${flex}${channelStyle}margin:0;min-width:0;text-align:${item.align}">
+    const groupRow = groupColors && !compact ? skin.groupRow ?? '' : '';
+    return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${flex}${channelStyle}${groupRow}margin:0;min-width:0;text-align:${item.align}">
       ${label}
-      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${muted}">${value}</dd>
+      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${valueTone}">${value}</dd>
     </dl>`;
 }
 
@@ -230,10 +234,12 @@ function renderGroup(palette, members, byKey, layout) {
         groupColors: colors, compact, distributes,
     })).join('\n    ');
     const flex = distributes ? 'flex:1 1 min(100%,14rem);' : '';
-    const align = compact && id === '2' && skin.header ? 'justify-content:flex-end;' : '';
-    const surface = compact || colors.background === 'transparent' ? colors.background
-        : skin.cellLine ?? layout.groups[id]?.background ?? palette.sceneBackground ?? colors.background;
-    return `<div data-rp-status-group style="${grid};${flex}min-width:0;padding:${pad};border-radius:12px;background:${surface};color:${colors.text};${compact ? skin.headerGroup ?? '' : skin.scene ?? ''}${align}">
+    const backgroundOverride = layout.groups[id]?.background;
+    const surface = compact ? backgroundOverride ?? palette.headerGroupBackground ?? colors.background
+        : colors.background === 'transparent' ? colors.background
+            : skin.cellLine ?? backgroundOverride ?? palette.sceneBackground ?? colors.background;
+    const weatherStyle = id === '2' ? skin.weatherGroup ?? '' : '';
+    return `<div data-rp-status-group style="${grid};${flex}min-width:0;padding:${pad};border-radius:12px;background:${surface};color:${colors.text};${compact ? skin.headerGroup ?? '' : skin.scene ?? ''}${weatherStyle}">
     ${markup}
   </div>`;
 }
@@ -281,7 +287,9 @@ export function makeThemePreset(palette, fields, savedLayout) {
         : palette.slack ? `${slackRail(palette.slack)}<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;padding:8px 11px 10px">${body}</div>`
             : [body, skin.footer].filter(Boolean).join('\n  ');
     const preset = palette.id ?? (palette.scheme === 'dark' ? 'dark' : 'white');
-    return `<section aria-label="상태 정보" data-rp-status-preset="${preset}" style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.cardBackground ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};font-size:${PRESET_FONT_SIZE};overflow-wrap:anywhere;${skin.card ?? ''}">
+    const typography = skin.typography ?? `font-size:${PRESET_FONT_SIZE};`;
+    const fixedTypography = skin.typography ? ' data-rp-status-fixed-typography' : '';
+    return `<section aria-label="상태 정보" data-rp-status-preset="${preset}"${fixedTypography} style="box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:14px;border-radius:18px;background:${layout.background ?? palette.cardBackground ?? palette.background};color:${palette.text};color-scheme:${palette.scheme};${typography}overflow-wrap:anywhere;${skin.card ?? ''}">
   ${content}
 </section>`;
 }

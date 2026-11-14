@@ -102,7 +102,7 @@ export function escapeHtml(value) {
 
 function gauge(label, value, compact = false) {
     const layout = compact ? 'display:inline-block;width:40px;max-width:100%;vertical-align:middle' : 'width:100%';
-    return `<progress class="rp-gauge" style="${layout};min-width:0;height:6px;accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
+    return `<progress class="rp-gauge" style="${layout};min-width:0;height:var(--rp-gauge-height,6px);accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${value}%</progress>`;
 }
 
 export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '') {
@@ -239,7 +239,7 @@ export function createCardRenderer() {
         wrapper.append(legacy.content);
         const outer = wrapper.firstElementChild;
         const inheritFont = !css && !embeddedCSS && (html === DEFAULT_HTML
-            || Boolean(outer?.matches('[data-rp-status-preset]:not([data-rp-status-custom])')));
+            || Boolean(outer?.matches('[data-rp-status-preset]:not([data-rp-status-custom], [data-rp-status-fixed-typography])')));
         const headings = wrapper.querySelectorAll('header, h1, h2, h3, h4, .rp-title');
         for (const title of [outer, outer?.firstElementChild, ...headings]) {
             if (title?.textContent.trim() === '상태창') title.remove();
@@ -278,12 +278,14 @@ export function createCardRenderer() {
     background: transparent;
 }
 :where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge::-webkit-progress-value {
-    background: var(--rp-gauge-accent, currentColor);
+    background: var(--rp-gauge-fill, var(--rp-gauge-accent, currentColor));
     border-radius: 999px;
+    box-shadow: var(--rp-gauge-glow, none);
 }
 :where([style*="--rp-gauge-track:"] .rp-gauge-display) .rp-gauge::-moz-progress-bar {
-    background: var(--rp-gauge-accent, currentColor);
+    background: var(--rp-gauge-fill, var(--rp-gauge-accent, currentColor));
     border-radius: 999px;
+    box-shadow: var(--rp-gauge-glow, none);
 }
 ${css || ''}
 ${embeddedCSS}`;
