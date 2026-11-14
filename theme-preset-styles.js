@@ -170,7 +170,15 @@ export const THEME_PRESETS = {
         background: '#050e08', text: '#f6f8f6', muted: '#b9c1bb', headerMuted: '#bdc3c0', scene: 'transparent',
         thought: '#17211b', gaugeBackground: '#202a24', gaugeText: '#f6f8f6', gaugeAccent: '#fafcfb',
         gaugeTrack: 'repeating-linear-gradient(90deg,#818b83 0 1px,transparent 1px 4px) center/100% 65% no-repeat',
-        widget: { weather: WIDGET_WEATHER, css: WIDGET_CSS },
+        widget: {
+            weather: WIDGET_WEATHER,
+            css: WIDGET_CSS,
+            detail: {
+                background: '#17211b',
+                style: 'display:grid;grid-template-columns:minmax(0,1fr);gap:4px;'
+                    + 'padding:clamp(9px,2.3cqi,14px) clamp(10px,2.5cqi,16px);border-radius:clamp(12px,3.2cqi,20px);',
+            },
+        },
         skin: {
             card: 'container-type:inline-size;padding:0;gap:0;border-radius:clamp(20px,4.6cqi,36px);word-break:keep-all;',
             typography: 'font-family:var(--rp-status-font-family,var(--mainFontFamily,-apple-system,system-ui,sans-serif));font-size:12px;line-height:1.45;',

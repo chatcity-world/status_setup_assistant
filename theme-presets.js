@@ -12,18 +12,18 @@ const DEFAULT_ORDER = ['날짜', '시간', '날씨', '기온', '장소', '옷차
 const HEX_COLOR = /^#[\da-f]{6}$/i;
 const GROUP_ID = /^[1-9]\d*$/;
 const SLACK_LAYOUT_VERSION = 2;
-const WIDGET_LAYOUT_VERSION = 3;
+const WIDGET_LAYOUT_VERSION = 4;
 const WIDGET_WEATHER_GROUP = '2';
+const WIDGET_DETAIL_FIELDS = new Set(['장소', '옷차림']);
 const DATE_TIME = ['날짜', '시간'];
 const WEATHER_READINGS = ['날씨', '기온'];
 
-function defaultItems(fields, palette) {
+function defaultItems(fields) {
     const byKey = indexFields(fields);
-    const order = palette?.widget ? ['날짜', '시간', '날씨', '기온', '옷차림', '장소'] : DEFAULT_ORDER;
-    const standard = [...order, '호감도', '속마음'].map(key => byKey.get(key)).filter(Boolean);
+    const standard = [...DEFAULT_ORDER, '호감도', '속마음'].map(key => byKey.get(key)).filter(Boolean);
     const extra = fields.filter(field => !standard.includes(field));
     return [
-        ...order.map(key => byKey.get(key)).filter(Boolean),
+        ...DEFAULT_ORDER.map(key => byKey.get(key)).filter(Boolean),
         ...extra.filter(field => field.type !== 'gauge'),
         byKey.get('호감도'),
         ...extra.filter(field => field.type === 'gauge'),
@@ -35,7 +35,7 @@ function defaultGroup(field, byKey, palette) {
     if (field === byKey.get('날짜') || field === byKey.get('시간')) return palette?.widget ? WIDGET_WEATHER_GROUP : '1';
     if (field === byKey.get('날씨') || field === byKey.get('기온')) return '2';
     if (field === byKey.get('속마음') || field === byKey.get('호감도')) return '';
-    if (field === byKey.get('장소') || field === byKey.get('옷차림')) return palette?.slack ? '' : '3';
+    if (field === byKey.get('장소') || field === byKey.get('옷차림')) return palette?.slack || palette?.widget ? '' : '3';
     return field.type === 'gauge' ? '' : '3';
 }
 
@@ -54,8 +54,8 @@ export function normalizeThemeLayout(fields, saved, palette) {
     const widget = Boolean(palette?.widget);
     const migrateSlack = slack && (saved?.version ?? 1) < SLACK_LAYOUT_VERSION;
     const layoutVersion = saved?.version ?? 1;
-    const migrateWidgetPlace = widget && layoutVersion < WIDGET_LAYOUT_VERSION;
-    const available = new Map(defaultItems(fields, palette).map(field => [field.key, field]));
+    const migrateWidgetDetails = widget && layoutVersion < WIDGET_LAYOUT_VERSION;
+    const available = new Map(defaultItems(fields).map(field => [field.key, field]));
     const groups = new Set([...THEME_GROUPS, ...Object.keys(saved?.groups ?? {}).filter(id => GROUP_ID.test(id))]);
     const items = [];
     const savedByKey = new Map((Array.isArray(saved?.items) ? saved.items : []).filter(item => item?.key).map(item => [item.key, item]));
@@ -64,20 +64,22 @@ export function normalizeThemeLayout(fields, saved, palette) {
         && [...savedByKey.values()].every(item => item.group !== '1' || DATE_TIME.includes(item.key));
     function add(field, existing) {
         const defaultId = defaultGroup(field, byKey, palette);
-        // Earlier Slack presets put both fields in group 3 and displayed the location in the header.
-        const isOldSlackSceneItem = migrateSlack && existing?.group === '3'
-            && (field === byKey.get('장소') || field === byKey.get('옷차림'));
-        const isOldWidgetDateItem = mergeWidgetDates && existing?.group === '1' && DATE_TIME.includes(field.key);
-        const isOldWidgetPlace = migrateWidgetPlace && field === byKey.get('장소') && existing?.group === WIDGET_WEATHER_GROUP;
-        const group = !isOldSlackSceneItem && !isOldWidgetDateItem && !isOldWidgetPlace && typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
-            ? existing.group : defaultId;
+        const savedGroup = existing?.group;
+        const moveSlackDetail = migrateSlack && (field === byKey.get('장소') || field === byKey.get('옷차림'));
+        const moveWidgetDetail = migrateWidgetDetails && WIDGET_DETAIL_FIELDS.has(field.key);
+        const splitScene = savedGroup === '3' && (moveSlackDetail || moveWidgetDetail);
+        const isOldWidgetDateItem = mergeWidgetDates && savedGroup === '1' && DATE_TIME.includes(field.key);
+        const isOldWidgetPlace = migrateWidgetDetails && field.key === '장소' && savedGroup === WIDGET_WEATHER_GROUP;
+        const keepGroup = !splitScene && !isOldWidgetDateItem && !isOldWidgetPlace;
+        const group = keepGroup && typeof savedGroup === 'string' && (savedGroup === '' || GROUP_ID.test(savedGroup))
+            ? savedGroup : defaultId;
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
         const label = !isOldWidgetPlace && typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
         const gaugeColor = existing?.gaugeColor;
         if (group) groups.add(group);
         items.push({
             key: field.key, group, align, label,
-            ...(isOldSlackSceneItem && colorSettings(saved?.groups?.['3'])),
+            ...(splitScene && colorSettings(saved?.groups?.['3'])),
             ...colorSettings(existing),
             ...(typeof gaugeColor === 'string' && HEX_COLOR.test(gaugeColor) && { gaugeColor }),
         });
@@ -92,13 +94,12 @@ export function normalizeThemeLayout(fields, saved, palette) {
         add(field);
         if (index >= 0) items.splice(index + 1, 0, items.pop());
     }
-    const savedPlace = savedByKey.get('장소');
-    if (widget && (!savedPlace || (migrateWidgetPlace && savedPlace.group === WIDGET_WEATHER_GROUP))) {
-        const place = items.findIndex(item => item.key === '장소');
-        const clothes = items.find(item => item.key === '옷차림' && item.group === '3');
-        if (place >= 0 && clothes) {
-            const [location] = items.splice(place, 1);
-            items.splice(items.indexOf(clothes) + 1, 0, location);
+    if (widget && (migrateWidgetDetails || !savedByKey.has('장소') || !savedByKey.has('옷차림'))) {
+        const placeIndex = items.findIndex(item => item.key === '장소' && !item.group);
+        const clothes = items.find(item => item.key === '옷차림' && !item.group);
+        if (placeIndex >= 0 && clothes && items[placeIndex + 1] !== clothes) {
+            const [place] = items.splice(placeIndex, 1);
+            items.splice(items.indexOf(clothes), 0, place);
         }
     }
     const orderedGroups = [...groups].sort((left, right) => left.length - right.length || left.localeCompare(right));
@@ -157,9 +158,10 @@ export function moveThemeItem(items, key, direction, visibleKeys) {
 }
 
 export function itemThemeColors(palette, field, item) {
+    const detail = !item.group && WIDGET_DETAIL_FIELDS.has(field.key) ? palette.widget?.detail : undefined;
     return {
         background: item.background ?? (field.key === '속마음' ? palette.thought
-            : field.type === 'gauge' ? palette.gaugeBackground ?? 'transparent' : 'transparent'),
+            : field.type === 'gauge' ? palette.gaugeBackground ?? 'transparent' : detail?.background ?? 'transparent'),
         text: item.text ?? (field.type === 'gauge' ? palette.gaugeText
             : field.key === '속마음' ? palette.thoughtText ?? palette.text : palette.text),
         gaugeColor: item.gaugeColor ?? palette.gaugeAccent,
@@ -203,6 +205,7 @@ export function useCustomThemeCode(code) {
 
 function renderPresetField(palette, field, item, { groupColors, compact = false, distributes = false, channel = false, rowStyle = '', valueStyle = '' } = {}) {
     const skin = palette.skin ?? {};
+    const detail = !item.group && WIDGET_DETAIL_FIELDS.has(field.key) ? palette.widget?.detail : undefined;
     const customText = item.group ? groupColors.customText : Boolean(item.text);
     const itemColors = itemThemeColors(palette, field, item);
     const { background, text } = groupColors ?? itemColors;
@@ -212,13 +215,13 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
         value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.gaugeValue);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
-    const centeredLabel = item.align !== 'left' || field.key === '속마음';
-    const inlineLabel = compact || !centeredLabel;
+    const stackedLabel = item.align !== 'left' || field.key === '속마음' || detail;
+    const inlineLabel = compact || !stackedLabel;
     const cell = skin.cellLine && groupColors && !compact;
     const labelColumn = compact ? 'max-content' : skin.labelColumn ?? 'minmax(40px,max-content)';
     const rowLayout = item.label && inlineLabel ? `display:grid;grid-template-columns:${labelColumn} minmax(0,1fr);align-items:baseline;gap:${cell ? 0 : skin.labelGap ?? 8}px;` : '';
     const roleStyle = channel ? `padding:${background === 'transparent' ? '0' : '2px 6px'};`
-        : field.key === '속마음' ? skin.thought : barName ? skin.gauge : '';
+        : detail?.style ?? (field.key === '속마음' ? skin.thought : barName ? skin.gauge : '');
     const padding = background === 'transparent' ? '1px 12px' : '11px 12px';
     const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${padding};${skin.item ?? ''}${roleStyle ?? ''}`;
     const labelTone = palette.widget && barName ? palette.text : compact ? palette.headerMuted ?? palette.muted : palette.muted;
@@ -232,7 +235,7 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const gaugeGlow = skin.gaugeGlow ? `--rp-gauge-glow:${skin.gaugeGlow};` : '';
     const gauge = barName ? `--rp-gauge-accent:${itemColors.gaugeColor};--rp-gauge-track:${palette.gaugeTrack};${gaugeFill}${gaugeGlow}` : '';
     const width = !item.group && field.key === '속마음' ? 'max-width:60ch;' : '';
-    const margin = !inlineLabel ? (item.label ? skin.stackedValueMargin ?? '4px auto 0' : '0 auto') : '0';
+    const margin = inlineLabel || detail ? '0' : item.label ? skin.stackedValueMargin ?? '4px auto 0' : '0 auto';
     const numeric = compact && ['시간', '기온'].includes(field.key);
     const valueColor = numeric ? palette.headerMuted ?? palette.muted : field.key === '장소' ? palette.locationText : undefined;
     const valueTone = valueColor && !customText ? `color:${valueColor};` : '';
