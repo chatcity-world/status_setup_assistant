@@ -321,19 +321,24 @@ function renderWidget(blocks, byKey) {
     ${blocks.map(block => block.html).join('\n    ')}
   </div>`;
     }
-    const right = blocks.filter((_, index) => index !== weatherIndex);
+    const last = blocks.at(-1);
+    const thought = last.group === '' && last.members[0].key === '속마음' ? last : undefined;
+    const right = blocks.filter((block, index) => index !== weatherIndex && block !== thought);
     const gap = 'clamp(7px,2.3cqi,15px)';
     const footerIndex = right.findIndex(block => block.members.some(item => item.key === '속마음' || byKey.get(item.key).type === 'gauge'));
     const details = right.slice(0, footerIndex < 0 ? right.length : footerIndex);
     const footer = footerIndex < 0 ? [] : right.slice(footerIndex);
-    return `<div class="rp-widget-columns" data-rp-status-group style="display:grid;grid-template-columns:var(--rp-widget-columns,clamp(142px,39%,240px) minmax(0,1fr));gap:${spacing};min-width:0;padding:${spacing}">
-    ${weather.html}
-    <div class="rp-widget-details" data-rp-status-group style="display:flex;flex-direction:column;gap:${gap};min-width:0;padding-top:clamp(3px,1.6cqi,14px)">
-      ${details.map(block => block.html).join('\n      ')}
-      <div data-rp-status-group style="display:grid;grid-template-columns:minmax(0,1fr);gap:${gap};margin-top:auto">
-        ${footer.map(block => block.html).join('\n        ')}
+    return `<div data-rp-status-group style="display:grid;grid-template-columns:minmax(0,1fr);gap:${spacing};min-width:0;padding:${spacing}">
+    <div class="rp-widget-columns" data-rp-status-group style="display:grid;grid-template-columns:var(--rp-widget-columns,clamp(142px,39%,240px) minmax(0,1fr));gap:${spacing};min-width:0">
+      ${weather.html}
+      <div class="rp-widget-details" data-rp-status-group style="display:flex;flex-direction:column;gap:${gap};min-width:0;padding-top:clamp(3px,1.6cqi,14px)">
+        ${details.map(block => block.html).join('\n        ')}
+        <div data-rp-status-group style="display:grid;grid-template-columns:minmax(0,1fr);gap:${gap};margin-top:auto">
+          ${footer.map(block => block.html).join('\n          ')}
+        </div>
       </div>
     </div>
+    ${thought?.html ?? ''}
   </div>`;
 }
 
