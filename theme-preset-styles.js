@@ -1,5 +1,5 @@
 const LCD = {
-    card: 'padding:6px;border-radius:12px;gap:5px;',
+    card: 'padding:11px;border:5px solid;border-radius:22px;box-shadow:inset 0 0 0 5px #fff;gap:5px;',
     header: 'gap:2px;',
     headerGroup: 'flex:1 1 116px;padding:6px 9px;border-radius:7px;',
     weatherGroup: 'justify-content:flex-end;',
@@ -90,14 +90,14 @@ export const THEME_PRESETS = {
         background: '#a4a995', text: '#20241a', muted: '#2a3325', headerMuted: '#20241a', headerBackground: '#bec3b0',
         scene: '#b3b9a5', thought: '#c0c5b2',
         gaugeBackground: '#939b84', gaugeText: '#20241a', gaugeAccent: '#20241a', gaugeTrack: '#757e68',
-        skin: { ...LCD, footer: lcdFooter('#989f89', '#dce1d057', '#20241a') },
+        skin: { ...LCD, card: `${LCD.card}border-color:#6f7562;`, footer: lcdFooter('#989f89', '#dce1d057', '#20241a') },
     },
     'pink-tamagotchi': {
         id: 'pink-tamagotchi', label: '핑크 다마고치', scheme: 'light', swatch: '#c8b2bc',
         background: '#c8b2bc', text: '#392e34', muted: '#643954', headerMuted: '#392e34', headerBackground: '#e1cdd4',
         scene: '#e4d4da', thought: '#eadce1',
         gaugeBackground: '#cfb6c0', gaugeText: '#392e34', gaugeAccent: '#624657', gaugeTrack: '#b69eab',
-        skin: { ...LCD, footer: lcdFooter('#c4abb6', '#eadce168', '#624657') },
+        skin: { ...LCD, card: `${LCD.card}border-color:#896e7a;`, footer: lcdFooter('#c4abb6', '#eadce168', '#624657') },
     },
     excel: {
         id: 'excel', label: '엑셀', scheme: 'light', swatch: '#216447',
