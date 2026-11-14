@@ -12,9 +12,9 @@ const DEFAULT_ORDER = ['날짜', '시간', '날씨', '기온', '장소', '옷차
 const HEX_COLOR = /^#[\da-f]{6}$/i;
 const GROUP_ID = /^[1-9]\d*$/;
 const SLACK_LAYOUT_VERSION = 2;
-const WIDGET_LAYOUT_VERSION = 4;
+const WIDGET_LAYOUT_VERSION = 5;
 const WIDGET_WEATHER_GROUP = '2';
-const WIDGET_DETAIL_FIELDS = new Set(['장소', '옷차림']);
+const WIDGET_DETAIL_ICONS = new Map([['장소', '📍'], ['옷차림', '🏃']]);
 const DATE_TIME = ['날짜', '시간'];
 const WEATHER_READINGS = ['날씨', '기온'];
 
@@ -54,7 +54,7 @@ export function normalizeThemeLayout(fields, saved, palette) {
     const widget = Boolean(palette?.widget);
     const migrateSlack = slack && (saved?.version ?? 1) < SLACK_LAYOUT_VERSION;
     const layoutVersion = saved?.version ?? 1;
-    const migrateWidgetDetails = widget && layoutVersion < WIDGET_LAYOUT_VERSION;
+    const migrateWidgetDetails = widget && layoutVersion < 4;
     const available = new Map(defaultItems(fields).map(field => [field.key, field]));
     const groups = new Set([...THEME_GROUPS, ...Object.keys(saved?.groups ?? {}).filter(id => GROUP_ID.test(id))]);
     const items = [];
@@ -66,7 +66,8 @@ export function normalizeThemeLayout(fields, saved, palette) {
         const defaultId = defaultGroup(field, byKey, palette);
         const savedGroup = existing?.group;
         const moveSlackDetail = migrateSlack && (field === byKey.get('장소') || field === byKey.get('옷차림'));
-        const moveWidgetDetail = migrateWidgetDetails && WIDGET_DETAIL_FIELDS.has(field.key);
+        const widgetDetail = widget && WIDGET_DETAIL_ICONS.has(field.key);
+        const moveWidgetDetail = migrateWidgetDetails && widgetDetail;
         const splitScene = savedGroup === '3' && (moveSlackDetail || moveWidgetDetail);
         const isOldWidgetDateItem = mergeWidgetDates && savedGroup === '1' && DATE_TIME.includes(field.key);
         const isOldWidgetPlace = migrateWidgetDetails && field.key === '장소' && savedGroup === WIDGET_WEATHER_GROUP;
@@ -74,7 +75,9 @@ export function normalizeThemeLayout(fields, saved, palette) {
         const group = keepGroup && typeof savedGroup === 'string' && (savedGroup === '' || GROUP_ID.test(savedGroup))
             ? savedGroup : defaultId;
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
-        const label = !isOldWidgetPlace && typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
+        const migrateWidgetLabel = widgetDetail && layoutVersion < WIDGET_LAYOUT_VERSION;
+        const label = !migrateWidgetLabel && typeof existing?.label === 'boolean' ? existing.label
+            : !TOP_FIELDS.has(field.key) && !widgetDetail;
         const gaugeColor = existing?.gaugeColor;
         if (group) groups.add(group);
         items.push({
@@ -158,7 +161,7 @@ export function moveThemeItem(items, key, direction, visibleKeys) {
 }
 
 export function itemThemeColors(palette, field, item) {
-    const detail = !item.group && WIDGET_DETAIL_FIELDS.has(field.key) ? palette.widget?.detail : undefined;
+    const detail = !item.group && WIDGET_DETAIL_ICONS.has(field.key) ? palette.widget?.detail : undefined;
     return {
         background: item.background ?? (field.key === '속마음' ? palette.thought
             : field.type === 'gauge' ? palette.gaugeBackground ?? 'transparent' : detail?.background ?? 'transparent'),
@@ -205,7 +208,8 @@ export function useCustomThemeCode(code) {
 
 function renderPresetField(palette, field, item, { groupColors, compact = false, distributes = false, channel = false, rowStyle = '', valueStyle = '' } = {}) {
     const skin = palette.skin ?? {};
-    const detail = !item.group && WIDGET_DETAIL_FIELDS.has(field.key) ? palette.widget?.detail : undefined;
+    const icon = palette.widget && WIDGET_DETAIL_ICONS.get(field.key);
+    const detail = icon && !item.group ? palette.widget.detail : undefined;
     const customText = item.group ? groupColors.customText : Boolean(item.text);
     const itemColors = itemThemeColors(palette, field, item);
     const { background, text } = groupColors ?? itemColors;
@@ -215,6 +219,8 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
         value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.gaugeValue);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
+    const iconLayout = icon ? 'display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:baseline;gap:6px;' : '';
+    if (icon) value = `<span aria-hidden="true">${icon}</span><span>${value}</span>`;
     const stackedLabel = item.align !== 'left' || field.key === '속마음' || detail;
     const inlineLabel = compact || !stackedLabel;
     const cell = skin.cellLine && groupColors && !compact;
@@ -246,7 +252,7 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const groupRow = groupColors && !compact ? skin.groupRow ?? '' : '';
     return `<dl data-rp-status-field="${escapeHtml(field.key)}" data-rp-status-hide-empty style="${rowLayout}${colors}${cellStyle}${flex}${channelStyle}${groupRow}margin:0;min-width:0;text-align:${item.align}${rowStyle ? ';' + rowStyle : ''}">
       ${label}
-      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${cellValue}${gauge}${valueTone}${valueStyle}">${value}</dd>
+      <dd style="margin:${margin};${width}min-width:0;white-space:pre-wrap;${iconLayout}${cellValue}${gauge}${valueTone}${valueStyle}">${value}</dd>
     </dl>`;
 }
 
@@ -348,7 +354,7 @@ function renderWidget(blocks, byKey) {
     return `<div data-rp-status-group style="display:grid;grid-template-columns:minmax(0,1fr);gap:${spacing};min-width:0;padding:${spacing}">
     <div class="rp-widget-columns" data-rp-status-group style="display:grid;grid-template-columns:var(--rp-widget-columns,clamp(142px,39%,240px) minmax(0,1fr));gap:${spacing};min-width:0">
       ${weather.html}
-      <div class="rp-widget-details" data-rp-status-group style="display:flex;flex-direction:column;gap:${gap};min-width:0;padding-top:clamp(3px,1.6cqi,14px)">
+      <div class="rp-widget-details" data-rp-status-group style="display:flex;flex-direction:column;gap:${gap};min-width:0">
         ${details.map(block => block.html).join('\n        ')}
         <div data-rp-status-group style="display:grid;grid-template-columns:minmax(0,1fr);gap:${gap};margin-top:auto">
           ${footer.map(block => block.html).join('\n          ')}
