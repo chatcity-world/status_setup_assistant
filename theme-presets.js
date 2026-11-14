@@ -216,7 +216,7 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const [valueName, barName] = themeVariableNames(field).map(escapeHtml);
     let value = `{{${valueName}}}`;
     if (barName) {
-        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.gaugeValue);
+        value = gaugeDisplay(`{{${barName}}}`, `{{${valueName}}}%`, skin.gaugeTrack, skin.gaugeValue, skin.gaugeTip);
         if (item.align !== 'left') value = `<span style="display:inline-block;width:min(100%,14rem);vertical-align:middle">${value}</span>`;
     }
     const iconLayout = icon ? 'display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:baseline;gap:6px;' : '';
@@ -229,11 +229,13 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const roleStyle = channel ? `padding:${background === 'transparent' ? '0' : '2px 6px'};`
         : detail?.style ?? (field.key === '속마음' ? skin.thought : barName ? skin.gauge : '');
     const padding = background === 'transparent' ? '1px 12px' : '11px 12px';
-    const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${padding};${skin.item ?? ''}${roleStyle ?? ''}`;
+    const surface = item.background ?? (field.key === '속마음' ? palette.thoughtBackground : barName ? palette.gaugeSurface : undefined) ?? background;
+    const colors = groupColors ? '' : `background:${surface};color:${text};border-radius:12px;padding:${padding};${skin.item ?? ''}${roleStyle ?? ''}`;
     const labelTone = palette.widget && barName ? palette.text : compact ? palette.headerMuted ?? palette.muted : palette.muted;
     const color = customText || channel ? 'inherit' : labelTone;
     const labelName = escapeHtml(field.label || field.key);
-    const labelStyle = `color:${color};${skin.label ?? ''}${cell ? 'padding:6px 9px;' : ''}`;
+    const thoughtLabel = field.key === '속마음' ? skin.thoughtLabel ?? '' : '';
+    const labelStyle = `color:${color};${skin.label ?? ''}${thoughtLabel}${cell ? 'padding:6px 9px;' : ''}`;
     const label = !item.label ? '' : channel
         ? `<dt style="${labelStyle}"><span aria-hidden="true"># </span><span data-rp-status-field-label>${labelName}</span></dt>`
         : `<dt data-rp-status-field-label style="${labelStyle}">${labelName}</dt>`;

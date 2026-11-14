@@ -106,9 +106,10 @@ function gauge(label, value, { compact = false, preview = false } = {}) {
     return `<progress class="rp-gauge" style="${layout};min-width:0;height:var(--rp-gauge-height,6px);accent-color:var(--rp-gauge-accent,currentColor)" value="${value}" max="100" aria-label="${escapeHtml(label)}">${fallback}</progress>`;
 }
 
-export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '') {
+export function gaugeDisplay(bar, percent, trackStyle = '', valueStyle = '', tipStyle = '') {
+    const tip = tipStyle ? `<span data-rp-status-gauge-tip aria-hidden="true" style="display:none;${tipStyle}"></span>` : '';
     return `<span class="rp-gauge-display" style="display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px">
-        <span style="display:flex;align-items:center;min-width:0;height:6px;overflow:hidden;border-radius:999px;background:var(--rp-gauge-track,transparent);${trackStyle}">${bar}</span>
+        <span style="display:flex;align-items:center;min-width:0;height:6px;overflow:hidden;border-radius:999px;background:var(--rp-gauge-track,transparent);${trackStyle}">${bar}${tip}</span>
         <span style="font-variant-numeric:tabular-nums;white-space:nowrap;${valueStyle}">${percent}</span>
     </span>`;
 }
@@ -177,7 +178,7 @@ function htmlFor(template, fields, values, inheritFont, preview) {
         if (walker.currentNode.data.includes('{{')) nodes.push(walker.currentNode);
     }
     let renderedFields = false;
-    function resolve(key, percent = '') {
+    function resolve(key, percent = '', gaugeTip) {
         if (key === '항목들') {
             if (renderedFields) return '';
             renderedFields = true;
@@ -189,7 +190,12 @@ function htmlFor(template, fields, values, inheritFont, preview) {
         const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined;
         if (format === 'gauge') {
             const percent = preview ? PREVIEW_GAUGE_FILL : normalizeValue(field, value);
-            return percent == null ? '' : gauge(field.label || field.key, percent, { preview });
+            if (percent == null) return '';
+            if (gaugeTip) {
+                gaugeTip.style.setProperty('inset-inline-start', `${percent}%`);
+                gaugeTip.style.removeProperty('display');
+            }
+            return gauge(field.label || field.key, percent, { preview });
         }
         if (format === 'display') return formatValue(field, value, { preview });
         if (preview) return escapeHtml(field.label || field.key);
@@ -197,7 +203,8 @@ function htmlFor(template, fields, values, inheritFont, preview) {
     }
     for (const node of nodes) {
         const replacement = document.createElement('template');
-        replacement.innerHTML = escapeHtml(node.data).replace(/\{\{\s*([^{}]+?)\s*\}\}(\s*%)?/g, (_, key, percent) => resolve(key, percent));
+        const gaugeTip = node.parentElement?.querySelector('[data-rp-status-gauge-tip]');
+        replacement.innerHTML = escapeHtml(node.data).replace(/\{\{\s*([^{}]+?)\s*\}\}(\s*%)?/g, (_, key, percent) => resolve(key, percent, gaugeTip));
         node.replaceWith(replacement.content);
     }
     return source.innerHTML;

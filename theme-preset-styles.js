@@ -193,6 +193,39 @@ export const THEME_PRESETS = {
             gaugeValue: 'font-weight:550;',
         },
     },
+    rofan: {
+        id: 'rofan', label: '로판', scheme: 'light', swatch: 'linear-gradient(145deg,#fbf5ec,#eed6dc)',
+        background: '#fbf5ec', text: '#422b36', muted: '#805567', scene: 'transparent',
+        cardBackground: 'radial-gradient(ellipse at top right,#eed6dc99,transparent 58%),'
+            + 'radial-gradient(ellipse at bottom left,#f5e0cd80,transparent 60%),#fbf5ec',
+        thought: '#f1e0e5', thoughtBackground: 'linear-gradient(160deg,#faf0e9,#f1e0e5)',
+        gaugeBackground: '#f8eee5', gaugeSurface: '#f4e8de80', gaugeText: '#7a3b55',
+        gaugeAccent: '#b97b8b', gaugeTrack: '#ddc8c8', gaugeFill: 'linear-gradient(90deg,#81445d,#b97b8b)',
+        skin: {
+            card: 'padding:15px 18px 16px;border:1px solid #b89a72;border-radius:16px;'
+                + 'box-shadow:inset 0 0 0 3px #fffaf3,inset 0 0 0 4px #b89a7266;word-break:keep-all;',
+            typography: 'font-family:var(--rp-status-font-family,var(--mainFontFamily,inherit));font-size:12px;line-height:1.55;',
+            // Four triangular gradients form the small diamond at the center of the divider.
+            header: 'gap:4px 14px;padding-bottom:14px;font-variant-numeric:tabular-nums;background:'
+                + 'linear-gradient(135deg,transparent 50%,#b89a72 50%) calc(50% - 2px) calc(100% - 4px)/4px 4px no-repeat,'
+                + 'linear-gradient(225deg,transparent 50%,#b89a72 50%) calc(50% + 2px) calc(100% - 4px)/4px 4px no-repeat,'
+                + 'linear-gradient(45deg,transparent 50%,#b89a72 50%) calc(50% - 2px) bottom/4px 4px no-repeat,'
+                + 'linear-gradient(315deg,transparent 50%,#b89a72 50%) calc(50% + 2px) bottom/4px 4px no-repeat,'
+                + 'linear-gradient(90deg,transparent,#b89a72 30% 70%,transparent) center calc(100% - 3.5px)/100% 1px no-repeat;',
+            headerGroup: 'padding:0;gap:2px 9px;',
+            scene: 'padding:1px 2px;',
+            labelColumn: '3.2em',
+            thought: 'display:grid;gap:3px;padding:9px 12px 10px;border:1px solid #ceaab0;border-radius:10px;'
+                + 'box-shadow:inset 0 0 0 2px #fffaf380;',
+            thoughtLabel: 'font-size:11px;',
+            stackedValueMargin: '0 auto',
+            gauge: 'grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:10px;'
+                + 'padding:8px 10px;border-radius:0;border-block:1px solid #b89a7240;',
+            gaugeTrack: '--rp-gauge-height:4px;height:var(--rp-gauge-height);position:relative;overflow:visible;',
+            gaugeTip: 'position:absolute;top:50%;width:6px;height:6px;margin-inline-start:-3px;'
+                + 'border:1px solid #a98960;background:#e2c8a2;transform:translateY(-50%) rotate(45deg);pointer-events:none;',
+        },
+    },
 };
 
 const SLACK_LOGO = [
