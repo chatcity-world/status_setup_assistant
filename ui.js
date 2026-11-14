@@ -1,6 +1,6 @@
 import { generateTheme, combinedCode, setThemeBackground, syncThemeFields, themeBackground } from './theme-builder.js';
 import { getCharacterProfile } from './settings.js';
-import { DEFAULT_HTML, themeVariableNames } from './theme.js';
+import { applyCardTypography, DEFAULT_HTML, themeVariableNames } from './theme.js';
 import { addThemeGroup, getLegacyThemePreset, getThemePreset, makeThemePreset, moveThemeItem, normalizeThemeLayout, THEME_PRESETS, useCustomThemeCode } from './theme-presets.js';
 import { mountThemeLayout } from './theme-layout-ui.js';
 import { createFieldKey, indexFields } from './status.js';
@@ -214,7 +214,7 @@ async function copyText(textarea) {
     }
 }
 
-export function mountSettings(target, { getCharacters, update, saveCurrent, removeProfile, renderCard }) {
+export function mountSettings(target, { getCharacters, update, saveCurrent, removeProfile, renderCard, getPreviewTypography }) {
     const drawer = document.createElement('div');
     drawer.className = 'inline-drawer';
     drawer.innerHTML = `
@@ -347,6 +347,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
             const values = !hasValues || previewingPreset ? { ...sample, ...previewValues } : previewValues;
             const hasSample = (!hasValues || previewingPreset) && enabled.some(field => !Object.hasOwn(previewValues, field.key));
             previewLabel.textContent = hasSample ? '미리보기 · 내용은 예시' : '미리보기';
+            applyCardTypography(previewCard, getPreviewTypography?.());
             renderCard(previewCard, settings.fields, values, html.value || DEFAULT_HTML, '');
         });
     }
@@ -362,7 +363,7 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     function updateThemeDraft(code) {
         html.value = code;
         draftPreset = getThemePreset(code) ?? getLegacyThemePreset(code);
-        if (draftPreset) draftLayouts[draftPreset] = normalizeThemeLayout(settings.fields, draftLayouts[draftPreset]);
+        if (draftPreset) draftLayouts[draftPreset] = normalizeThemeLayout(settings.fields, draftLayouts[draftPreset], THEME_PRESETS[draftPreset]);
         syncPresetSelection();
         paintPreview();
     }
@@ -706,8 +707,10 @@ export function mountSettings(target, { getCharacters, update, saveCurrent, remo
     }
     setupTabs(root, paintPreview);
 
-    return next => {
+    function updatePanel(next) {
         state = next;
         syncPanel();
-    };
+    }
+    updatePanel.refreshPreview = paintPreview;
+    return updatePanel;
 }

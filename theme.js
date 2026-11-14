@@ -198,6 +198,20 @@ function htmlFor(template, fields, values, inheritFont) {
     return source.innerHTML;
 }
 
+export function applyCardTypography(host, { fontFamily, fontSize, fontWeight, fontStyle, lineHeight } = {}) {
+    const lineRatio = Number.parseFloat(lineHeight) / Number.parseFloat(fontSize);
+    const typography = {
+        '--rp-status-font-family': fontFamily,
+        '--rp-status-font-size': fontSize,
+        '--rp-status-font-weight': fontWeight,
+        '--rp-status-font-style': fontStyle,
+        '--rp-status-line-height': Number.isFinite(lineRatio) ? String(lineRatio) : lineHeight,
+    };
+    for (const [property, value] of Object.entries(typography)) {
+        if (host.style.getPropertyValue(property) !== (value || '')) host.style.setProperty(property, value || '');
+    }
+}
+
 export function createCardRenderer() {
     const painted = new WeakMap();
     const canShareCSS = typeof CSSStyleSheet === 'function'

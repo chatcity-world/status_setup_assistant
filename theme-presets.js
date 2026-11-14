@@ -11,6 +11,7 @@ const TOP_FIELDS = new Set(['날짜', '시간', '날씨', '기온']);
 const DEFAULT_ORDER = ['날짜', '시간', '날씨', '기온', '장소', '옷차림'];
 const HEX_COLOR = /^#[\da-f]{6}$/i;
 const GROUP_ID = /^[1-9]\d*$/;
+const SLACK_LAYOUT_VERSION = 2;
 
 function defaultItems(fields) {
     const byKey = indexFields(fields);
@@ -25,11 +26,11 @@ function defaultItems(fields) {
     ].filter(Boolean);
 }
 
-function defaultGroup(field, byKey) {
+function defaultGroup(field, byKey, slack) {
     if (field === byKey.get('날짜') || field === byKey.get('시간')) return '1';
     if (field === byKey.get('날씨') || field === byKey.get('기온')) return '2';
     if (field === byKey.get('속마음') || field === byKey.get('호감도')) return '';
-    if (field === byKey.get('장소') || field === byKey.get('옷차림')) return '3';
+    if (field === byKey.get('장소') || field === byKey.get('옷차림')) return slack ? '' : '3';
     return field.type === 'gauge' ? '' : '3';
 }
 
@@ -42,21 +43,28 @@ function colorSettings(saved) {
     };
 }
 
-export function normalizeThemeLayout(fields, saved) {
+export function normalizeThemeLayout(fields, saved, palette) {
     const byKey = indexFields(fields);
+    const slack = Boolean(palette?.slack);
+    const migrateSlack = slack && (saved?.version ?? 1) < SLACK_LAYOUT_VERSION;
     const available = new Map(defaultItems(fields).map(field => [field.key, field]));
     const groups = new Set([...THEME_GROUPS, ...Object.keys(saved?.groups ?? {}).filter(id => GROUP_ID.test(id))]);
     const items = [];
     const savedByKey = new Map((Array.isArray(saved?.items) ? saved.items : []).filter(item => item?.key).map(item => [item.key, item]));
     function add(field, existing) {
-        const group = typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
-            ? existing.group : defaultGroup(field, byKey);
+        const defaultId = defaultGroup(field, byKey, slack);
+        // Earlier Slack presets put both fields in group 3 and displayed the location in the header.
+        const isOldSlackSceneItem = migrateSlack && existing?.group === '3'
+            && (field === byKey.get('장소') || field === byKey.get('옷차림'));
+        const group = !isOldSlackSceneItem && typeof existing?.group === 'string' && (existing.group === '' || GROUP_ID.test(existing.group))
+            ? existing.group : defaultId;
         const align = ALIGNMENTS.includes(existing?.align) ? existing.align : field === byKey.get('속마음') ? 'center' : 'left';
         const label = typeof existing?.label === 'boolean' ? existing.label : !TOP_FIELDS.has(field.key);
         const gaugeColor = existing?.gaugeColor;
         if (group) groups.add(group);
         items.push({
             key: field.key, group, align, label,
+            ...(isOldSlackSceneItem && colorSettings(saved?.groups?.['3'])),
             ...colorSettings(existing),
             ...(typeof gaugeColor === 'string' && HEX_COLOR.test(gaugeColor) && { gaugeColor }),
         });
@@ -66,7 +74,7 @@ export function normalizeThemeLayout(fields, saved) {
         if (available.has(key)) add(available.get(key), savedByKey.get(key));
     }
     for (const field of available.values()) {
-        const group = defaultGroup(field, byKey);
+        const group = defaultGroup(field, byKey, slack);
         const index = group ? items.findLastIndex(item => item.group === group) : -1;
         add(field);
         if (index >= 0) items.splice(index + 1, 0, items.pop());
@@ -75,6 +83,7 @@ export function normalizeThemeLayout(fields, saved) {
     return {
         items,
         groups: Object.fromEntries(orderedGroups.map(id => [id, colorSettings(saved?.groups?.[id])])),
+        ...(slack && { version: SLACK_LAYOUT_VERSION }),
         ...(HEX_COLOR.test(saved?.background) && { background: saved.background }),
     };
 }
@@ -182,8 +191,10 @@ function renderPresetField(palette, field, item, { groupColors, compact = false,
     const cell = skin.cellLine && groupColors && !compact;
     const labelColumn = compact ? 'max-content' : skin.labelColumn ?? 'minmax(40px,max-content)';
     const rowLayout = item.label && inlineLabel ? `display:grid;grid-template-columns:${labelColumn} minmax(0,1fr);align-items:baseline;gap:${cell ? 0 : 8}px;` : '';
-    const roleStyle = field.key === '속마음' ? skin.thought : barName ? skin.gauge : '';
-    const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${background === 'transparent' ? '1px 12px' : '11px 12px'};${skin.item ?? ''}${roleStyle ?? ''}`;
+    const roleStyle = channel ? `padding:${background === 'transparent' ? '0' : '2px 6px'};`
+        : field.key === '속마음' ? skin.thought : barName ? skin.gauge : '';
+    const padding = background === 'transparent' ? '1px 12px' : '11px 12px';
+    const colors = groupColors ? '' : `background:${background};color:${text};border-radius:12px;padding:${padding};${skin.item ?? ''}${roleStyle ?? ''}`;
     const labelTone = compact ? palette.headerMuted ?? palette.muted : palette.muted;
     const color = customText || channel ? 'inherit' : labelTone;
     const labelName = escapeHtml(field.label || field.key);
@@ -227,22 +238,17 @@ function renderGroup(palette, members, byKey, layout) {
   </div>`;
 }
 
-function renderSlack(palette, blocks, byKey, layout) {
+function renderSlack(palette, blocks, byKey) {
     const { header, divider } = palette.slack;
-    const [dates, weather, scene, ...remaining] = blocks;
-    const [channel, ...sceneItems] = scene.members;
-    const colors = groupThemeColors(palette, layout, scene.group);
-    colors.customText = Boolean(layout.groups[scene.group]?.text);
-    const title = renderPresetField(palette, byKey.get(channel.key), channel, {
-        groupColors: colors, compact: true, channel: true,
-    });
-    const head = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:8px 11px;background:${layout.groups[scene.group]?.background ?? header};color:${colors.text};border-bottom:1px solid ${divider}">
+    const [dates, weather, location, ...remaining] = blocks;
+    const [channel] = location.members;
+    const title = renderPresetField(palette, byKey.get(channel.key), channel, { compact: true, channel: true });
+    const head = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:8px 11px;background:${header};border-bottom:1px solid ${divider}">
     ${title}
     <div data-rp-status-group style="margin-inline-start:auto">${weather.html}</div>
   </div>`;
     const dateLine = `<div data-rp-status-group style="display:flex;justify-content:center;background:linear-gradient(${divider},${divider}) center/100% 1px no-repeat">${dates.html}</div>`;
-    const sceneHtml = sceneItems.length ? renderGroup(palette, sceneItems, byKey, layout) : '';
-    const body = [dateLine, sceneHtml, ...remaining.map(block => block.html)].filter(Boolean).join('\n    ');
+    const body = [dateLine, ...remaining.map(block => block.html)].join('\n    ');
     return `${slackRail(palette.slack)}
   <div style="min-width:0">
     ${head}
@@ -253,7 +259,7 @@ function renderSlack(palette, blocks, byKey, layout) {
 }
 
 export function makeThemePreset(palette, fields, savedLayout) {
-    const layout = normalizeThemeLayout(fields, savedLayout);
+    const layout = normalizeThemeLayout(fields, savedLayout, palette);
     const byKey = new Map(fields.filter(field => field.enabled).map(field => [field.key, field]));
     const blocks = layoutBlocks(layout.items.filter(item => byKey.has(item.key))).map(members => {
         const [item] = members;
@@ -262,7 +268,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
     });
     const skin = palette.skin ?? {};
     const firstGroups = blocks[0]?.group === '1' && blocks[1]?.group === '2';
-    const slackHeader = palette.slack && firstGroups && blocks[2]?.group === '3' && blocks[2].members[0].key === '장소';
+    const slackHeader = palette.slack && firstGroups && blocks[2]?.group === '' && blocks[2].members[0].key === '장소';
     if (firstGroups && !slackHeader) {
         const header = `<div data-rp-status-group style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px 16px;${skin.header ?? ''}">
     ${blocks[0].html}
@@ -271,7 +277,7 @@ export function makeThemePreset(palette, fields, savedLayout) {
         blocks.splice(0, 2, { html: header });
     }
     const body = blocks.map(block => block.html).join('\n  ');
-    const content = slackHeader ? renderSlack(palette, blocks, byKey, layout)
+    const content = slackHeader ? renderSlack(palette, blocks, byKey)
         : palette.slack ? `${slackRail(palette.slack)}<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;padding:8px 11px 10px">${body}</div>`
             : [body, skin.footer].filter(Boolean).join('\n  ');
     const preset = palette.id ?? (palette.scheme === 'dark' ? 'dark' : 'white');

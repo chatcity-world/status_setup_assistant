@@ -4,7 +4,7 @@ import {
 import {
     deleteCharacterProfile, getActiveSettings, loadRpSettings, profileKey, saveCharacterProfile, saveProfileSettings,
 } from './settings.js';
-import { createCardRenderer } from './theme.js';
+import { applyCardTypography, createCardRenderer } from './theme.js';
 import { mountSettings } from './ui.js';
 
 const getContext = () => SillyTavern.getContext();
@@ -23,9 +23,8 @@ let alignmentFrame = 0;
 const observedColumns = new Set();
 const textResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(requestAlignment) : null;
 
-function contentEdges(element) {
+function contentEdges(element, style = getComputedStyle(element)) {
     const { left, right } = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
     const pixels = property => Number.parseFloat(style[property]) || 0;
     return {
         left: left + pixels('borderLeftWidth') + pixels('paddingLeft'),
@@ -36,17 +35,31 @@ function contentEdges(element) {
 function textEdges(body, columns) {
     let left = Infinity;
     let right = -Infinity;
+    let typography;
     for (const paragraph of body.querySelectorAll('p')) {
         if (!paragraph.textContent.trim() || !paragraph.getClientRects().length) continue;
         if (body.contains(paragraph.closest('blockquote, details, table, li, [data-type="assistant_note"]'))) continue;
-        const edges = contentEdges(paragraph);
+        const style = getComputedStyle(paragraph);
+        const edges = contentEdges(paragraph, style);
         if (edges.right <= edges.left) continue;
-        columns.add(paragraph);
+        columns?.add(paragraph);
+        typography ??= style;
         left = Math.min(left, edges.left);
         right = Math.max(right, edges.right);
     }
-    if (right <= left) return contentEdges(body);
-    return { left, right };
+    if (!typography) {
+        typography = getComputedStyle(body);
+        return { ...contentEdges(body, typography), typography };
+    }
+    return { left, right, typography };
+}
+
+function previewTypography() {
+    const body = messageCards.at(-1)?.body
+        ?? chatRoot?.querySelector('.mes[is_user="false"] .mes_text')
+        ?? chatRoot?.querySelector('.mes_text');
+    if (!body) return getComputedStyle(document.body);
+    return textEdges(body).typography;
 }
 
 function alignMessageCards() {
@@ -59,23 +72,12 @@ function alignMessageCards() {
         const prose = textEdges(body, columns);
         const available = contentEdges(frame);
         if (Math.min(prose.right, available.right) <= Math.max(prose.left, available.left)) continue;
-        const { fontFamily, fontSize, fontWeight, fontStyle, lineHeight } = getComputedStyle(body);
-        const lineRatio = Number.parseFloat(lineHeight) / Number.parseFloat(fontSize);
-        const typography = {
-            '--rp-status-font-family': fontFamily,
-            '--rp-status-font-size': fontSize,
-            '--rp-status-font-weight': fontWeight,
-            '--rp-status-font-style': fontStyle,
-            '--rp-status-line-height': Number.isFinite(lineRatio) ? String(lineRatio) : lineHeight,
-        };
-        insets.push({ frame, left: Math.max(0, prose.left - available.left), right: Math.max(0, available.right - prose.right), typography });
+        insets.push({ frame, left: Math.max(0, prose.left - available.left), right: Math.max(0, available.right - prose.right), typography: prose.typography });
     }
     for (const { frame, left, right, typography } of insets) {
         frame.style.setProperty('--rp-status-text-left', `${left}px`);
         frame.style.setProperty('--rp-status-text-right', `${right}px`);
-        for (const [property, value] of Object.entries(typography)) {
-            if (value && frame.style.getPropertyValue(property) !== value) frame.style.setProperty(property, value);
-        }
+        applyCardTypography(frame, typography);
     }
     if (!textResizeObserver) return;
     for (const column of observedColumns) {
@@ -95,6 +97,7 @@ function requestAlignment() {
     alignmentFrame = requestAnimationFrame(() => {
         alignmentFrame = 0;
         alignMessageCards();
+        updateSettingsPanel?.refreshPreview();
     });
 }
 
@@ -321,6 +324,7 @@ function initialize() {
             saveCurrent: saveCurrentCharacter,
             removeProfile: removeCharacterProfile,
             renderCard: createCardRenderer(),
+            getPreviewTypography: previewTypography,
         });
     }
     if (chatRoot) {

@@ -40,9 +40,10 @@ function copySettings(saved) {
     if (weather) weather.rule = defaultWeatherRule;
     const fields = assignThemeVariables(settings.fields);
     const preset = getThemePreset(settings.html);
-    if (preset && settings.themeLayouts[preset]) {
-        settings.themeLayouts[preset] = normalizeThemeLayout(fields, settings.themeLayouts[preset]);
-        settings.html = makeThemePreset(THEME_PRESETS[preset], fields, settings.themeLayouts[preset]);
+    const palette = THEME_PRESETS[preset];
+    if (palette && (settings.themeLayouts[preset] || palette.slack)) {
+        settings.themeLayouts[preset] = normalizeThemeLayout(fields, settings.themeLayouts[preset], palette);
+        settings.html = makeThemePreset(palette, fields, settings.themeLayouts[preset]);
     } else {
         settings.html = syncThemeFields(settings.html, settings.fields, fields);
     }
@@ -90,8 +91,8 @@ export function saveProfileSettings(shared, avatar, changes) {
         const source = changes.html ?? settings.html;
         const themeLayouts = { ...(changes.themeLayouts ?? settings.themeLayouts) };
         const preset = getThemePreset(source);
-        for (const key of Object.keys(THEME_PRESETS)) {
-            if (themeLayouts[key]) themeLayouts[key] = normalizeThemeLayout(fields, themeLayouts[key]);
+        for (const [key, palette] of Object.entries(THEME_PRESETS)) {
+            if (themeLayouts[key]) themeLayouts[key] = normalizeThemeLayout(fields, themeLayouts[key], palette);
         }
         const html = preset && themeLayouts[preset]
             ? makeThemePreset(THEME_PRESETS[preset], fields, themeLayouts[preset])
