@@ -151,9 +151,9 @@ function formatValue(field, value, { compact = false, preview = false } = {}) {
 }
 
 function htmlFor(template, fields, values, inheritFont, preview) {
-    const filled = fields.filter(field => field.enabled && (preview || Object.hasOwn(values, field.key)));
-    const rows = filled.map(field => {
-        const detail = formatValue(field, values[field.key], { compact: true, preview });
+    const rows = fields.filter(field => field.enabled).map(field => {
+        const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined;
+        const detail = formatValue(field, value, { compact: true, preview });
         return `<div class="rp-field" style="display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%">
             <dt class="rp-label" style="flex:none;max-width:45%;${inheritFont ? '' : 'font-size:.85em;'}opacity:.75;overflow-wrap:anywhere">${escapeHtml(field.label)}</dt>
             <dd class="rp-value" style="min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${detail}</dd>
@@ -162,10 +162,12 @@ function htmlFor(template, fields, values, inheritFont, preview) {
     const variables = indexFields(fields);
     const source = document.createElement('template');
     source.innerHTML = template;
+    const preset = source.content.firstElementChild?.matches('[data-rp-status-preset]:not([data-rp-status-custom])');
     for (const row of source.content.querySelectorAll('[data-rp-status-field]')) {
         const key = row.dataset.rpStatusField;
         const field = variables.get(key);
-        const missingValue = !preview && row.hasAttribute('data-rp-status-hide-empty')
+        const hideEmpty = row.hasAttribute('data-rp-status-hide-empty') && !(preset && row.localName === 'dl');
+        const missingValue = !preview && hideEmpty
             && (!Object.hasOwn(values, key) || values[key] == null || values[key] === '');
         if (!field?.enabled || field.key !== key || missingValue) row.remove();
     }

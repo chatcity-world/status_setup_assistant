@@ -214,8 +214,10 @@ function promptJson(value) {
 export function promptFor(values, fields, { character, user } = {}) {
     const active = fields.filter(field => field.enabled);
     if (!active.length) return '';
-    const current = Object.fromEntries(active.filter(field => Object.hasOwn(values, field.key))
-        .map(field => [field.variable ?? field.key, values[field.key]]));
+    const current = Object.fromEntries(active.map(field => [
+        field.variable ?? field.key,
+        Object.hasOwn(values, field.key) ? values[field.key] : null,
+    ]));
     const keys = active.map(field => `${field.variable ?? field.key}${field.type === 'gauge' ? ' (integer 0–100)' : ''}`).join(', ');
     const labels = active.filter(field => field.label && field.label !== (field.variable ?? field.key))
         .map(field => [field.variable ?? field.key, field.label]);
@@ -223,13 +225,12 @@ export function promptFor(values, fields, { character, user } = {}) {
     const rules = active.filter(field => typeof field.rule === 'string' && field.rule.trim())
         .map(({ key, variable, rule }) => [variable ?? key, rule.trim().replace(/\{\{\s*(char|user)\s*\}\}/gi, (_, name) => names[name.toLowerCase()])]);
     return [
-        `Current roleplay scene state (JSON data): ${promptJson(current)}`,
         `Allowed state keys: ${keys}.`,
         ...(labels.length ? [`Field display names by key: ${promptJson(Object.fromEntries(labels))}`] : []),
         ...(rules.length ? [`Apply these writing rules only to the corresponding state values: ${promptJson(Object.fromEntries(rules))}`] : []),
-        'Write the roleplay response first. If the response changes the scene, append one update block on its own lines using the exact markers below. Replace {} with a JSON object containing only the keys that changed. Use strings for text, integers for gauges, and null to clear a value.',
-        'Keep unchanged values. Leave uncertain facts unset. Do not assign private thoughts, decisions, or actions to the user. If using 속마음, it refers to the speaking character.',
-        'If no value changes, omit the block. Keep any separate status summary out of the visible roleplay response.',
-        '[[RP_STATUS]]\n{}\n[[/RP_STATUS]]',
+        'Write the roleplay body first. Then always append exactly one status block using the markers on separate lines as shown below. Use the markers only around that block, outside any thinking or roleplay text.',
+        'The JSON below lists the required keys and their prior values. Include every key exactly as written, starting with the first reply and even when nothing changed. Copy unchanged values, update changed values, and replace each null with a value from the current scene. For unspecified details, choose plausible values consistent with the story and the field rules.',
+        'Give every text field a nonempty string and every gauge an integer from 0 to 100. Do not assign private thoughts, decisions, or actions to the user. If using 속마음, it refers to the speaking character.',
+        `[[RP_STATUS]]\n${promptJson(current)}\n[[/RP_STATUS]]`,
     ].join('\n');
 }
