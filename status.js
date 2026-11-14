@@ -9,7 +9,7 @@ export const DEFAULT_FIELDS = [
     ['기온', '현재 롤플레잉의 기온을 섭씨(°C)로 표기'],
     ['장소', '현재 롤플레잉의 장소를 간단하게 표시'],
     ['옷차림', '현재 {{char}}의 옷차림을 간단하게 표시'],
-    ['호감도', '현재 {{user}}에 대한 {{char}}의 호감도를 퍼센트(%)로 표시', 'gauge'],
+    ['호감도', '{{user}}에 대한 {{char}}의 호감도를 퍼센트(%)로 표시', 'gauge'],
     ['속마음', '현재 {{char}}의 속마음을 1-2문장으로 표시'],
 ].map(([key, rule, type = 'text']) => ({ key, label: key, type, enabled: true, rule }));
 

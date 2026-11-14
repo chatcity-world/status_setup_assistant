@@ -12,6 +12,7 @@ const defaults = {
     css: '',
     theme: DEFAULT_THEME,
     themeLayouts: {},
+    affinityRuleInitialized: false,
 };
 
 const previousDefaultKeys = ['날짜', '시간', '날씨', '기온', '장소', '옷차림', '포즈', '커뮤니티글', '속마음', '애정', '죄책감', '욕구'];
@@ -20,6 +21,8 @@ const previousDefaultRules = [
     ['날짜', '현재 롤플레잉 날짜를 YYYY년 MM월 DD일로 표시'],
     ['날씨', '현재 롤플레잉의 날씨를 짧은 단어로 표시'],
 ];
+const previousAffinityRule = '현재 {{user}}에 대한 {{char}}의 호감도를 퍼센트(%)로 표시';
+const defaultAffinityRule = DEFAULT_FIELDS.find(field => field.key === '호감도').rule;
 
 function usesPreviousDefaults(settings) {
     return settings.html === DEFAULT_HTML && !settings.css && Array.isArray(settings.fields)
@@ -41,6 +44,15 @@ function copySettings(saved) {
     for (const [key, rule] of previousDefaultRules) {
         const field = settings.fields.find(field => field.key === key && field.rule === rule);
         if (field) field.rule = DEFAULT_FIELDS.find(field => field.key === key).rule;
+    }
+    if (!settings.affinityRuleInitialized) {
+        const affinity = settings.fields.find(field => field.key === '호감도')
+            ?? settings.fields.find(field => field.key === '애정');
+        if (affinity?.type === 'gauge') {
+            const rule = typeof affinity.rule === 'string' ? affinity.rule.trim() : '';
+            if (!rule || rule === previousAffinityRule) affinity.rule = defaultAffinityRule;
+        }
+        settings.affinityRuleInitialized = true;
     }
     const fields = assignThemeVariables(settings.fields);
     const preset = getThemePreset(settings.html);
